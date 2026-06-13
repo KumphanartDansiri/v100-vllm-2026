@@ -72,6 +72,21 @@ def mtp():
     return md(["model", "prec", "k", "off tok/s", "mtp tok/s", "speedup", "accept", "exactness"], lines)
 
 
+def eager_cudagraph():
+    p = os.path.join(BASE, "data", "eager_vs_cudagraph.csv")
+    if not os.path.exists(p):
+        return "_(pending the paired eager-vs-cudagraph run)_"
+    rr = list(csv.DictReader(open(p)))
+    base = {(r["model"], r["prec"]): float(r["decode_tps"]) for r in rr
+            if r["mode"] == "eager" and r["decode_tps"] not in ("nan", "")}
+    lines = []
+    for r in rr:
+        key, d = (r["model"], r["prec"]), r["decode_tps"]
+        rel = f"{float(d) / base[key]:.2f}x" if (key in base and d not in ("nan", "")) else "-"
+        lines.append([f"{r['model']} {r['prec']}", r["mode"], d, rel, r["result_log"]])
+    return md(["model", "mode", "tok/s", "relative", "result_path"], lines)
+
+
 def resolve(cmd):
     cmd = cmd.strip()
     if cmd == "overview":
@@ -80,6 +95,8 @@ def resolve(cmd):
         return moe_fix()
     if cmd == "mtp":
         return mtp()
+    if cmd == "eager_cudagraph":
+        return eager_cudagraph()
     if cmd.startswith("model:"):
         return model(cmd.split(":", 1)[1])
     return f"_(unknown render command: {cmd})_"

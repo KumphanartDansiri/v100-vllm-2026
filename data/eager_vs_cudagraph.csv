@@ -1,0 +1,5 @@
+model,prec,tp,mode,decode_tps,result_log
+q27b,fp16,4,eager,7.13,results/eager_vs_cudagraph_20260613_121255/q27b_eager.log
+q27b,fp16,4,cudagraph,39.09,results/eager_vs_cudagraph_20260613_121255/q27b_cudagraph.log
+q35b,fp8,4,eager,7.23,results/eager_vs_cudagraph_20260613_121255/q35b_eager.log
+q35b,fp8,4,cudagraph,70.57,results/eager_vs_cudagraph_20260613_121255/q35b_cudagraph.log

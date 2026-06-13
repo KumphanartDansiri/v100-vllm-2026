@@ -186,6 +186,14 @@ if os.path.exists(chain):
                          "result_path": rel,
                          "notes": f"Ch4 MTP; off={offv}; speedup={spd}; accept={acc}; exactness={exact}"})
 
+# ---- Ch3 eager-vs-cudagraph paired data: copy the latest SUMMARY.csv verbatim into data/
+# (kept SEPARATE from the main matrix so eager numbers can never leak into serving tables) ----
+import shutil
+evc = sorted(glob.glob(f"{REPO}/results/eager_vs_cudagraph_*/SUMMARY.csv"))
+if evc:
+    shutil.copy(evc[-1], os.path.join(os.path.dirname(OUT), "eager_vs_cudagraph.csv"))
+    print(f"copied Ch3 paired data from {evc[-1]}")
+
 with open(OUT, "w", newline="") as f:
     w = csv.DictWriter(f, fieldnames=COLS)
     w.writeheader()
