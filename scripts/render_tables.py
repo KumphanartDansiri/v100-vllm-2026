@@ -44,10 +44,10 @@ def overview():
 
 
 def moe_fix():
+    # Only the Ch2 A/B rows (base/kbest/auto, single+8u) — excludes the Ch1 stock duplicate.
     lines = [[r["model"], r["config"], f"{r['users']}u", r["tok_s_per_user"],
               r["tok_s_aggregate"] or "-"]
-             for r in rows
-             if r["variant"] == "fp16" and ("moe_patch" in r["config"] or "pre-moe-patch" in r["config"])]
+             for r in rows if "Ch2 MoE fix" in r["notes"]]
     return md(["model", "config", "users", "per-user tok/s", "aggregate tok/s"], lines)
 
 

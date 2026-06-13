@@ -58,9 +58,15 @@ if ch1:
         m0 = statistics.median(decs)
         decs = [d for d in decs if d <= 3 * m0]
         tts = [t for _, t in v]
-        # FP16 MoE (q35b/g26b) Ch1 cells are pre-patch stock; dense/FP8 unaffected by the patch
+        # config column is unambiguous (Codex review): the FP16-MoE Ch1 cells are pre-patch
+        # stock; dense fp16 / GPTQ-int4 are unmodified vLLM; FP8 uses our sm_70 plugin.
         is_moe = key in ("q35b", "g26b")
-        cfg = "stock(pre-moe-patch)" if (is_moe and prec == "fp16") else "stock"
+        if is_moe and prec == "fp16":
+            cfg = "stock(pre-moe-patch)"
+        elif prec == "fp8":
+            cfg = "fp8-plugin+coalesced"
+        else:
+            cfg = "stock-vllm"
         rows.append({"model": name, "variant": prec, "params_total_b": pt,
                      "params_active_b": pa, "quant": prec, "vllm_version": "0.21.0",
                      "torch_cuda": "cu126", "gpu": "V100-32GB", "tp": CH1_TP.get(key, ""),
@@ -68,8 +74,7 @@ if ch1:
                      "cudagraph": 1, "mtp": 0, "config": cfg,
                      "tok_s_per_user": med(decs), "tok_s_aggregate": "",
                      "ttft_s": round(min(tts), 2) if tts else "", "memory_gb": "",
-                     "flags": "skip-mm,ns8" + (",fp8-plugin+coalesced" if prec == "fp8" else ""),
-                     "result_path": rel_path,
+                     "flags": "skip-mm,ns8", "result_path": rel_path,
                      "notes": "Ch1 reliability; decode=median Q1, ttft=steady min"})
 
 
@@ -128,6 +133,33 @@ for key, (sp, mp) in MOE.items():
                          "tok_s_per_user": pu, "tok_s_aggregate": ag, "ttft_s": "",
                          "memory_gb": "", "flags": "skip-mm,ns8", "result_path": mp,
                          "notes": "Ch2 MoE fix A/B (8 concurrent)"})
+
+# ---- TP × concurrency sweeps (model pages) ----
+for sumf in sorted(glob.glob(f"{REPO}/results/tp_sweep_*/SUMMARY.txt")):
+    dname = os.path.basename(os.path.dirname(sumf))      # tp_sweep_<key>_<prec>_<stamp>
+    parts = dname.split("_")
+    if len(parts) < 4:
+        continue
+    key, prec = parts[2], parts[3]
+    name, pt, pa = MODEL.get(key, (key, "", ""))
+    rel = f"results/{dname}/SUMMARY.txt"
+    txt = open(sumf).read()
+    cell = {}   # (tp, users) -> {"pu":[...], "ag":[...]}
+    for m in re.finditer(r"TP(\d+) users=(\d+) run\d+: per_user=([0-9.]+) tok/s aggregate=([0-9.]+)", txt):
+        tp, users, pu, ag = m.group(1), m.group(2), float(m.group(3)), float(m.group(4))
+        d = cell.setdefault((tp, users), {"pu": [], "ag": []})
+        d["pu"].append(pu); d["ag"].append(ag)
+    is_moe = key in ("q35b", "g26b", "q122b", "glm")
+    cfg = "fp8-plugin+coalesced" if prec == "fp8" else ("+moe_patch" if is_moe else "stock-vllm")
+    for (tp, users), d in sorted(cell.items()):
+        rows.append({"model": name, "variant": prec, "params_total_b": pt,
+                     "params_active_b": pa, "quant": prec, "vllm_version": "0.21.0",
+                     "torch_cuda": "cu126", "gpu": "V100-32GB", "tp": int(tp),
+                     "max_model_len": 4096, "users": int(users), "mode": "cudagraph",
+                     "cudagraph": 1, "mtp": 0, "config": cfg,
+                     "tok_s_per_user": med(d["pu"]), "tok_s_aggregate": med(d["ag"]),
+                     "ttft_s": "", "memory_gb": "", "flags": "skip-mm,ns8",
+                     "result_path": rel, "notes": "TP×concurrency sweep (model page)"})
 
 with open(OUT, "w", newline="") as f:
     w = csv.DictWriter(f, fieldnames=COLS)

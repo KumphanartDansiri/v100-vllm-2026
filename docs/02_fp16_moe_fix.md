@@ -83,13 +83,14 @@ GEMM's default Volta-blind. This is a gap, not a hardware ceiling.
 
 ## Upstreaming
 
-Reported to **both** engines, framed for what each will take:
-- **vLLM** (our main engine — we run 0.21 on V100): filed as a finding, not an sm_70-support PR.
-  The general-interest part: the decode-branch `BLOCK_K=128` default may be worth re-checking for
-  small-M even on `cp.async` hardware — we only have V100 evidence, so we pose it as a question,
-  plus the V100 config files as a data contribution.
-- **aphrodite-engine** (broad-arch support; where we learned the sm_70 build approach): the full
-  fix including the sm<80 heuristic, as a PR.
+**Prepared for two upstream paths** (drafted; not yet submitted — no links to share yet), framed
+for what each engine will take:
+- **vLLM** (our main engine — we run 0.21 on V100): to be filed as a *finding*, not an sm_70-support
+  PR. The general-interest part: the decode-branch `BLOCK_K=128` default may be worth re-checking for
+  small-M even on `cp.async` hardware — we only have V100 evidence, so it's posed as a question, plus
+  the V100 config files as a data contribution.
+- **aphrodite-engine** (broad-arch support; where we learned the sm_70 build approach): to be
+  submitted as a PR with the full fix including the sm<80 heuristic.
 
 ## Caveats (so nobody over-reads this)
 
