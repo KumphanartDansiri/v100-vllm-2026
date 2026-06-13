@@ -1,5 +1,8 @@
 # Chapter 2 — The FP16 MoE bug: 4–9× left on the floor by one default
 
+> **Status: DRAFT** — numbers provisional until the final freeze rerun ([docs/FINAL_RERUN.md](FINAL_RERUN.md)). Tables auto-render from `data/benchmark_matrix.csv`.
+
+
 **Claim:** stock vLLM runs FP16 Mixture-of-Experts models *slower than a same-class dense model*
 on V100 — which is backwards, since a sparse MoE touches less weight per token. It's not the
 hardware. It's a single config default that's wrong for Volta, and a one-file fix recovers 4–9×.
@@ -21,7 +24,24 @@ at M=1. Prefill already gets `BLOCK_K=64` — only decode is hit.
 
 ## Fix & result (table rendered from the SSOT)
 
-<!-- render: python3 scripts/render_tables.py moe_fix -->
+<!-- render:moe_fix -->
+| model | config | users | per-user tok/s | aggregate tok/s |
+|---|---|---|---|---|
+| gemma-4-26B-A4B-it | stock(pre-moe-patch) | 1u | 10.2 | - |
+| Qwen3.6-35B-A3B | stock(pre-moe-patch) | 1u | 15.44 | - |
+| Qwen3.6-35B-A3B | stock(pre-moe-patch) | 1u | 15.56 | - |
+| Qwen3.6-35B-A3B | stock(pre-moe-patch) | 8u | 3.16 | 24.93 |
+| Qwen3.6-35B-A3B | +moe_patch(heuristic) | 1u | 65.91 | - |
+| Qwen3.6-35B-A3B | +moe_patch(heuristic) | 8u | 20.98 | 137.2 |
+| Qwen3.6-35B-A3B | +moe_patch(tuned-json) | 1u | 65.85 | - |
+| Qwen3.6-35B-A3B | +moe_patch(tuned-json) | 8u | 22.8 | 173.92 |
+| gemma-4-26B-A4B-it | stock(pre-moe-patch) | 1u | 10.91 | - |
+| gemma-4-26B-A4B-it | stock(pre-moe-patch) | 8u | 3.58 | 28.3 |
+| gemma-4-26B-A4B-it | +moe_patch(heuristic) | 1u | 43.66 | - |
+| gemma-4-26B-A4B-it | +moe_patch(heuristic) | 8u | 19.1 | 145.15 |
+| gemma-4-26B-A4B-it | +moe_patch(tuned-json) | 1u | 43.71 | - |
+| gemma-4-26B-A4B-it | +moe_patch(tuned-json) | 8u | 20.23 | 155.94 |
+<!-- endrender -->
 
 Single-stream: 35B **15.6→65.9 (4.2×)**, gemma **10.9→43.6 (4.0×)**, output bit-identical. The win
 *grows with concurrency* (stock degrades ~linearly with batch): at 8 users, 35B per-user

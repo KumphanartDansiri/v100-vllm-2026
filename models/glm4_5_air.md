@@ -8,3 +8,8 @@
 - FP16 baseline / FP8 result: see matrix rows
 - single / multi-user tok/s: see matrix rows
 - caveats: TBD
+
+
+<!-- render:model:GLM-4.5-Air -->
+_(no rows match 'GLM-4.5-Air' yet — pending measurement)_
+<!-- endrender -->
