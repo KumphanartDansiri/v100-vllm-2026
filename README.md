@@ -35,6 +35,9 @@ zero source patches.** That's the unlock; everything else builds on it.
    [gemma-4-31B](models/gemma4_31b.md) ·
    [gemma-4-26B-A4B](models/gemma4_26b_a4b.md) ·
    [GLM-4.5-Air](models/glm4_5_air.md)
+7. [Dead ends & lessons](docs/07_dead_ends_and_lessons.md) — the optimizations we measured and
+   *didn't* ship (num_stages, FP8 route/scatter, w2, FA-for-ViT, cp.async-imitation), and why that
+   makes the wins trustworthy.
 
 ## Status
 
