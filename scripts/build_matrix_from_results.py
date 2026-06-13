@@ -193,13 +193,36 @@ if os.path.exists(chain):
                          "result_path": rel,
                          "notes": f"Ch4 MTP; off={offv}; speedup={spd}; accept={acc}; exactness={exact}"})
 
-# ---- Ch3 eager-vs-cudagraph paired data: copy the latest SUMMARY.csv verbatim into data/
-# (kept SEPARATE from the main matrix so eager numbers can never leak into serving tables) ----
-import shutil
+# ---- Ch3 eager-vs-cudagraph: pivot to one row per model (official name), columns
+# eager | cudagraph | improvement(cg/eager); list ALL families (measured filled, others 'pending').
+# Kept SEPARATE from the main matrix so eager numbers can never leak into serving tables.
+# One representative serving config per family. ----
+CH3_MODELS = [("q27b", "fp16"), ("q35b", "fp8"), ("q122b", "fp8"),
+              ("g31b", "fp16"), ("g26b", "fp8"), ("glm", "fp8")]
 evc = sorted(glob.glob(f"{REPO}/results/eager_vs_cudagraph_*/SUMMARY.csv"))
+meas, evc_src = {}, ""
 if evc:
-    shutil.copy(evc[-1], os.path.join(os.path.dirname(OUT), "eager_vs_cudagraph.csv"))
-    print(f"copied Ch3 paired data from {evc[-1]}")
+    evc_src = os.path.relpath(os.path.dirname(evc[-1]), REPO)
+    for r in csv.DictReader(open(evc[-1])):
+        meas.setdefault((r["model"], r["prec"]), {})[r["mode"]] = (r["decode_tps"], r["result_log"])
+ch3_out = os.path.join(os.path.dirname(OUT), "eager_vs_cudagraph.csv")
+with open(ch3_out, "w", newline="") as f:
+    w = csv.DictWriter(f, fieldnames=["model", "eager_tok_s", "cudagraph_tok_s", "improvement",
+                                      "eager_log", "cudagraph_log"])
+    w.writeheader()
+    nmeas = 0
+    for key, prec in CH3_MODELS:
+        m = meas.get((key, prec), {})
+        eg, eg_log = m.get("eager", ("", ""))
+        cg, cg_log = m.get("cudagraph", ("", ""))
+        try:
+            imp = f"{float(cg) / float(eg):.2f}x"; nmeas += 1
+        except (ValueError, ZeroDivisionError):
+            imp = "pending"
+        w.writerow({"model": mname(key, prec), "eager_tok_s": eg or "pending",
+                    "cudagraph_tok_s": cg or "pending", "improvement": imp,
+                    "eager_log": eg_log, "cudagraph_log": cg_log})
+    print(f"wrote Ch3 eager/cudagraph ({nmeas}/{len(CH3_MODELS)} measured; src={evc_src or 'none'})")
 
 with open(OUT, "w", newline="") as f:
     w = csv.DictWriter(f, fieldnames=COLS)

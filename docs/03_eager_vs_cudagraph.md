@@ -16,22 +16,26 @@ This is the comparison contract for the whole series. One rule:
 ## The measured pair (same model, TP, prompt, harness — only the mode changes)
 
 <!-- render:eager_cudagraph -->
-| model | mode | tok/s | relative | result_path |
-|---|---|---|---|---|
-| q27b fp16 | eager | 7.13 | 1.00x | results/eager_vs_cudagraph_20260613_121255/q27b_eager.log |
-| q27b fp16 | cudagraph | 39.09 | 5.48x | results/eager_vs_cudagraph_20260613_121255/q27b_cudagraph.log |
-| q35b fp8 | eager | 7.23 | 1.00x | results/eager_vs_cudagraph_20260613_121255/q35b_eager.log |
-| q35b fp8 | cudagraph | 70.57 | 9.76x | results/eager_vs_cudagraph_20260613_121255/q35b_cudagraph.log |
+| model | eager tok/s | cudagraph tok/s | improvement |
+|---|---|---|---|
+| Qwen/Qwen3.6-27B | 7.13 | 39.09 | 5.48x |
+| Qwen/Qwen3.6-35B-A3B-FP8 | 7.23 | 70.57 | 9.76x |
+| Qwen/Qwen3.5-122B-A10B-FP8 | pending | pending | pending |
+| google/gemma-4-31B-it | pending | pending | pending |
+| RedHatAI/gemma-4-26B-A4B-it-FP8-Dynamic | pending | pending | pending |
+| zai-org/GLM-4.5-Air-FP8 | pending | pending | pending |
 <!-- endrender -->
 
-Two things to read off it:
+Rows marked *pending* await the same paired measurement (one representative serving config per
+family); they're listed so the contract covers the whole fleet, not just the two anchors. Two things
+to read off the measured pairs:
 1. **CUDAGraph is 5–10× faster than eager** on the exact same setup. If you benchmark V100 in eager
    and conclude it's too slow, that's the mistake — you measured Python, not the GPU.
-2. **Both models run at ~7 tok/s in eager** — a 27B dense and a 35B-A3B MoE, wildly different models,
-   land within 0.1 tok/s of each other. That's the tell: eager decode is bottlenecked on per-step
-   *launch overhead*, not on the model. CUDAGraph removes that overhead, and only then do the models'
-   real speeds (39 vs 71) appear. (The MoE gains more — 9.8× vs 5.5× — because it has more per-step
-   kernel launches for eager to waste and cudagraph to erase.)
+2. **Both measured models run at ~7 tok/s in eager** — a 27B dense and a 35B-A3B MoE, wildly different
+   models, land within 0.1 tok/s of each other. That's the tell: eager decode is bottlenecked on
+   per-step *launch overhead*, not on the model. CUDAGraph removes that overhead, and only then do the
+   models' real speeds (39 vs 71) appear. (The MoE gains more — 9.8× vs 5.5× — because it has more
+   per-step kernel launches for eager to waste and cudagraph to erase.)
 
 ## Why this governs every other chapter
 All Chapter 1 / FP8 / model-page numbers are cudagraph; the MoE fix (Ch2) and MTP (Ch4) A/Bs are

@@ -82,14 +82,8 @@ def eager_cudagraph():
     if not os.path.exists(p):
         return "_(pending the paired eager-vs-cudagraph run)_"
     rr = list(csv.DictReader(open(p)))
-    base = {(r["model"], r["prec"]): float(r["decode_tps"]) for r in rr
-            if r["mode"] == "eager" and r["decode_tps"] not in ("nan", "")}
-    lines = []
-    for r in rr:
-        key, d = (r["model"], r["prec"]), r["decode_tps"]
-        rel = f"{float(d) / base[key]:.2f}x" if (key in base and d not in ("nan", "")) else "-"
-        lines.append([f"{r['model']} {r['prec']}", r["mode"], d, rel, r["result_log"]])
-    return md(["model", "mode", "tok/s", "relative", "result_path"], lines)
+    lines = [[r["model"], r["eager_tok_s"], r["cudagraph_tok_s"], r["improvement"]] for r in rr]
+    return md(["model", "eager tok/s", "cudagraph tok/s", "improvement"], lines)
 
 
 def resolve(cmd):
