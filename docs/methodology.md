@@ -5,6 +5,10 @@ truth), extracted from raw result files by `scripts/build_matrix_from_results.py
 carries a `result_path` back to the evidence. Read these definitions before comparing any
 two numbers — most "V100 is slow" claims online compare incomparable things.
 
+> **`result_path` values are relative to the companion code repo `fp8-w8a16-sm70/`**, where the
+> raw serve logs and summaries live (this repo holds the curated evidence; that repo holds the
+> kernels, the plugin, and the full logs). They are textual references, not links within this repo.
+
 ## Hardware & stack
 - **GPU:** Tesla V100-SXM2-32GB (sm_70, Volta), 8× in one box, NVLink.
 - **Engine:** vLLM 0.21.0 **built from source on a CUDA 12.6 toolchain** (image

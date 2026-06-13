@@ -1,6 +1,6 @@
 # Chapter 2 — The FP16 MoE bug: vLLM leaves 4–9× on the floor on V100
 
-> **Status: DRAFT** — numbers provisional until the final freeze rerun ([docs/FINAL_RERUN.md](FINAL_RERUN.md)). Tables auto-render from `data/benchmark_matrix.csv`.
+> **Status: DRAFT** — numbers provisional until the final freeze ([FINAL_RERUN.md](FINAL_RERUN.md)). Tables auto-render from `data/benchmark_matrix.csv`.
 
 If you run a Mixture-of-Experts model in FP16 on a V100 with stock vLLM, it is **slower than a
 dense model of similar size** — which is backwards. A sparse MoE only activates a few experts per
@@ -37,7 +37,7 @@ The real culprit was one tile dimension over: **`BLOCK_SIZE_K`**. The decode bra
 M≤64) picks `BLOCK_SIZE_K=128`. On V100 that register-spills Triton's codegen — the spill traffic
 contends on memory bandwidth and the cost grows roughly linearly with batch. Drop it to 64 and the
 kernel is ~2.3× faster at batch 1 and up to ~9× at batch 16. (The prefill path already uses 64;
-only decode picked the bad value.) Kernel time vs `BLOCK_K` at batch 1: **64 → 632 µs, 128 → 1450
+only decode picked the bad value.) Kernel time vs `BLOCK_SIZE_K` at batch 1: **64 → 632 µs, 128 → 1450
 µs, 256 → 2300 µs** — almost monotonic in that one knob.
 
 The lesson we keep relearning: a mechanism that *sounds* right (no `cp.async` → hates deep pipelines)
@@ -69,7 +69,7 @@ Single-stream, the inversion is gone: 35B goes from ~15.6 to **~66 tok/s (≈4×
 approximation). The win *grows with concurrency* because the stock kernel degrades with batch: at
 8 concurrent users the 35B aggregate goes from ~25 to **~174 tok/s**. Sparse-beats-dense is restored.
 
-Two forms ship: a **default-on heuristic** (`BLOCK_K=64` for small-M on sm<80 — works for any MoE
+Two forms ship: a **default-on heuristic** (`BLOCK_SIZE_K=64` for small-M on sm<80 — works for any MoE
 model and any TP with no per-model tuning) and, for the two models we tuned exhaustively, **per-M
 autotuned config files** that add another ~5–10% at concurrency over the heuristic.
 
@@ -86,7 +86,7 @@ GEMM's default Volta-blind. This is a gap, not a hardware ceiling.
 **Prepared for two upstream paths** (drafted; not yet submitted — no links to share yet), framed
 for what each engine will take:
 - **vLLM** (our main engine — we run 0.21 on V100): to be filed as a *finding*, not an sm_70-support
-  PR. The general-interest part: the decode-branch `BLOCK_K=128` default may be worth re-checking for
+  PR. The general-interest part: the decode-branch `BLOCK_SIZE_K=128` default may be worth re-checking for
   small-M even on `cp.async` hardware — we only have V100 evidence, so it's posed as a question, plus
   the V100 config files as a data contribution.
 - **aphrodite-engine** (broad-arch support; where we learned the sm_70 build approach): to be
@@ -100,6 +100,6 @@ for what each engine will take:
   hardware. The fixed FP16 number (~66) is the honest comparator used elsewhere in this write-up.
 - Measured on V100-32GB, vLLM 0.21+cu126, cudagraph. Build details in Chapter 1.
 
-*Evidence: `results/moe_stages_ab_*` (A/B runs), `results/moe_decode_tile_sweep_*` (the BLOCK_K
+*Evidence: `results/moe_stages_ab_*` (A/B runs), `results/moe_decode_tile_sweep_*` (the BLOCK_SIZE_K
 sweep), `results/moe_decode_msweep_*` (batch-scaling). Full root-cause trace lives in the code
 repo's `docs/V100_OPTIMIZATION_FINDINGS.md`.*
