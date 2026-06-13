@@ -60,12 +60,26 @@ def model(sub):
                 r["tok_s_aggregate"] or "-", r["ttft_s"] or "-", r["result_path"]] for r in sel])
 
 
+def mtp():
+    lines = []
+    for r in rows:
+        if not r["config"].startswith("+mtp"):
+            continue
+        n = r["notes"]
+        g = lambda k: (re.search(rf"{k}=(\S+?)[;\s]", n + " ") or [None, "-"])[1]
+        lines.append([r["model"], r["variant"], r["config"].replace("+mtp", "").strip("()"),
+                      g("off"), r["tok_s_per_user"], g("speedup"), g("accept"), g("exactness")])
+    return md(["model", "prec", "k", "off tok/s", "mtp tok/s", "speedup", "accept", "exactness"], lines)
+
+
 def resolve(cmd):
     cmd = cmd.strip()
     if cmd == "overview":
         return overview()
     if cmd == "moe_fix":
         return moe_fix()
+    if cmd == "mtp":
+        return mtp()
     if cmd.startswith("model:"):
         return model(cmd.split(":", 1)[1])
     return f"_(unknown render command: {cmd})_"

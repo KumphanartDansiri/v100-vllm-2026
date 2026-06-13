@@ -161,6 +161,31 @@ for sumf in sorted(glob.glob(f"{REPO}/results/tp_sweep_*/SUMMARY.txt")):
                      "ttft_s": "", "memory_gb": "", "flags": "skip-mm,ns8",
                      "result_path": rel, "notes": "TP×concurrency sweep (model page)"})
 
+# ---- Ch4 MTP A/B (off vs mtp k, accept%, exactness) from the chain summary ----
+chain = f"{REPO}/results/ch2_mtp_20260612/CHAIN_SUMMARY.txt"
+if os.path.exists(chain):
+    rel = "results/ch2_mtp_20260612/CHAIN_SUMMARY.txt"
+    text = open(chain).read()
+    parts = re.split(r"────\s*(\S+)\s*────", text)
+    for keyprec, body in zip(parts[1::2], parts[2::2]):
+        key, _, prec = keyprec.rpartition("_")
+        name, pt, pa = MODEL.get(key, (keyprec, "", ""))
+        for km in re.finditer(
+            r"k=(\d+): SPEEDUP off=([0-9.]+) -> mtp=([0-9.]+|nan) tok/s = (\S+) \| "
+            r"accept=(\S+) \| EXACTNESS: (\w+)", body):
+            k, offv, mtpv, spd, acc, exact = km.groups()
+            if mtpv == "nan":
+                continue  # failed/unsupported cell (e.g. gemma NotImplementedError) — noted in prose
+            rows.append({"model": name, "variant": prec, "params_total_b": pt,
+                         "params_active_b": pa, "quant": prec, "vllm_version": "0.21.0",
+                         "torch_cuda": "cu126", "gpu": "V100-32GB", "tp": "",
+                         "max_model_len": 4096, "users": 1, "mode": "cudagraph",
+                         "cudagraph": 1, "mtp": int(k), "config": f"+mtp(k={k})",
+                         "tok_s_per_user": float(mtpv), "tok_s_aggregate": "", "ttft_s": "",
+                         "memory_gb": "", "flags": "skip-mm,ns8",
+                         "result_path": rel,
+                         "notes": f"Ch4 MTP; off={offv}; speedup={spd}; accept={acc}; exactness={exact}"})
+
 with open(OUT, "w", newline="") as f:
     w = csv.DictWriter(f, fieldnames=COLS)
     w.writeheader()

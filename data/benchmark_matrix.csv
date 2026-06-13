@@ -27,3 +27,7 @@ Qwen3.6-27B,fp8,27,27,fp8,0.21.0,cu126,V100-32GB,4,4096,1,cudagraph,1,0,fp8-plug
 Qwen3.6-27B,fp8,27,27,fp8,0.21.0,cu126,V100-32GB,4,4096,8,cudagraph,1,0,fp8-plugin+coalesced,14.96,119.66,,,"skip-mm,ns8",results/tp_sweep_q27b_fp8_20260613_110847/SUMMARY.txt,TP×concurrency sweep (model page)
 Qwen3.6-27B,fp8,27,27,fp8,0.21.0,cu126,V100-32GB,8,4096,1,cudagraph,1,0,fp8-plugin+coalesced,44.95,44.95,,,"skip-mm,ns8",results/tp_sweep_q27b_fp8_20260613_110847/SUMMARY.txt,TP×concurrency sweep (model page)
 Qwen3.6-27B,fp8,27,27,fp8,0.21.0,cu126,V100-32GB,8,4096,8,cudagraph,1,0,fp8-plugin+coalesced,20.73,165.83,,,"skip-mm,ns8",results/tp_sweep_q27b_fp8_20260613_110847/SUMMARY.txt,TP×concurrency sweep (model page)
+Qwen3.6-35B-A3B,fp8,35,3,fp8,0.21.0,cu126,V100-32GB,,4096,1,cudagraph,1,1,+mtp(k=1),66.38,,,,"skip-mm,ns8",results/ch2_mtp_20260612/CHAIN_SUMMARY.txt,Ch4 MTP; off=70.06; speedup=0.95x; accept=83.9%; exactness=DIFF
+Qwen3.5-122B-A10B,fp8,122,10,fp8,0.21.0,cu126,V100-32GB,,4096,1,cudagraph,1,1,+mtp(k=1),48.2,,,,"skip-mm,ns8",results/ch2_mtp_20260612/CHAIN_SUMMARY.txt,Ch4 MTP; off=45.86; speedup=1.05x; accept=87.4%; exactness=DIFF
+Qwen3.6-27B,fp8,27,27,fp8,0.21.0,cu126,V100-32GB,,4096,1,cudagraph,1,1,+mtp(k=1),26.48,,,,"skip-mm,ns8",results/ch2_mtp_20260612/CHAIN_SUMMARY.txt,Ch4 MTP; off=36.28; speedup=0.73x; accept=88.4%; exactness=EXACT
+Qwen3.6-35B-A3B,fp16,35,3,fp16,0.21.0,cu126,V100-32GB,,4096,1,cudagraph,1,1,+mtp(k=1),17.2,,,,"skip-mm,ns8",results/ch2_mtp_20260612/CHAIN_SUMMARY.txt,Ch4 MTP; off=15.86; speedup=1.08x; accept=84.9%; exactness=DIFF
