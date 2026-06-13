@@ -17,6 +17,12 @@ eats the gain. The clean proof is the **same model at two baselines**: Qwen3.6-3
 ## k=1 results (cudagraph, single-stream)
 
 <!-- render:mtp -->
+| model | prec | k | off tok/s | mtp tok/s | speedup | accept | exactness |
+|---|---|---|---|---|---|---|---|
+| Qwen/Qwen3.6-35B-A3B-FP8 | fp8 | k=1 | 70.06 | 66.38 | 0.95x | 83.9% | DIFF |
+| Qwen/Qwen3.5-122B-A10B-FP8 | fp8 | k=1 | 45.86 | 48.2 | 1.05x | 87.4% | DIFF |
+| Qwen/Qwen3.6-27B-FP8 | fp8 | k=1 | 36.28 | 26.48 | 0.73x | 88.4% | EXACT |
+| Qwen/Qwen3.6-35B-A3B | fp16 | k=1 | 15.86 | 17.2 | 1.08x | 84.9% | DIFF |
 <!-- endrender -->
 
 Read it with the acceptance/exactness columns, not tok/s alone:

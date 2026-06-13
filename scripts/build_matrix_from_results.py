@@ -17,15 +17,22 @@ COLS = ["model", "variant", "params_total_b", "params_active_b", "quant",
         "mode", "cudagraph", "mtp", "config", "tok_s_per_user", "tok_s_aggregate",
         "ttft_s", "memory_gb", "flags", "result_path", "notes"]
 
-# static model facts (params in billions; total/active)
-MODEL = {
-    "q27b":  ("Qwen3.6-27B",        27, 27),
-    "q35b":  ("Qwen3.6-35B-A3B",    35, 3),
-    "q122b": ("Qwen3.5-122B-A10B",  122, 10),
-    "g31b":  ("gemma-4-31B-it",     31, 31),
-    "g26b":  ("gemma-4-26B-A4B-it", 26, 4),
-    "glm":   ("GLM-4.5-Air",        106, 12),
+# Official HF checkpoint id per (model key, quant) — shown verbatim in tables for reproducibility.
+PARAMS = {"q27b": (27, 27), "q35b": (35, 3), "q122b": (122, 10),
+          "g31b": (31, 31), "g26b": (26, 4), "glm": (106, 12)}
+CHECKPOINT = {
+    ("q27b", "fp16"): "Qwen/Qwen3.6-27B",   ("q27b", "fp8"): "Qwen/Qwen3.6-27B-FP8",
+    ("q35b", "fp16"): "Qwen/Qwen3.6-35B-A3B", ("q35b", "fp8"): "Qwen/Qwen3.6-35B-A3B-FP8",
+    ("q122b", "fp8"): "Qwen/Qwen3.5-122B-A10B-FP8",
+    ("q122b", "int4"): "Qwen/Qwen3.5-122B-A10B-GPTQ-Int4",
+    ("g31b", "fp16"): "google/gemma-4-31B-it", ("g31b", "fp8"): "RedHatAI/gemma-4-31B-it-FP8-Dynamic",
+    ("g26b", "fp16"): "google/gemma-4-26B-A4B-it", ("g26b", "fp8"): "RedHatAI/gemma-4-26B-A4B-it-FP8-Dynamic",
+    ("glm", "fp8"): "zai-org/GLM-4.5-Air-FP8",
 }
+QLABEL = {"int4": "GPTQ-Int4"}  # show the quant method, not bare "int4"
+def mname(key, q): return CHECKPOINT.get((key, q), key)
+def mparams(key): return PARAMS.get(key, ("", ""))
+def qlabel(q): return QLABEL.get(q, q)
 CH1_TP = {"q27b": 4, "q35b": 4, "g26b": 4, "g31b": 4, "q122b": 8}
 rows = []
 
@@ -52,7 +59,7 @@ if ch1:
     rel_path = "results/ch1_20260611/ch1.1_021/manifest.csv"
     for (label, prec), v in sorted(by.items()):
         key = label.split("-")[0]
-        name, pt, pa = MODEL.get(key, (label, "", ""))
+        name = mname(key, prec); pt, pa = mparams(key)
         decs = [d for d, _ in v]
         # drop gross outliers (>3x median) before median — warmup/measurement glitches
         m0 = statistics.median(decs)
@@ -67,8 +74,8 @@ if ch1:
             cfg = "fp8-plugin+coalesced"
         else:
             cfg = "stock-vllm"
-        rows.append({"model": name, "variant": prec, "params_total_b": pt,
-                     "params_active_b": pa, "quant": prec, "vllm_version": "0.21.0",
+        rows.append({"model": name, "variant": qlabel(prec), "params_total_b": pt,
+                     "params_active_b": pa, "quant": qlabel(prec), "vllm_version": "0.21.0",
                      "torch_cuda": "cu126", "gpu": "V100-32GB", "tp": CH1_TP.get(key, ""),
                      "max_model_len": 8192, "users": 1, "mode": "cudagraph",
                      "cudagraph": 1, "mtp": 0, "config": cfg,
@@ -110,7 +117,7 @@ MOE = {
 ARM_CFG = {"base": "stock(pre-moe-patch)", "kbest": "+moe_patch(heuristic)",
            "auto": "+moe_patch(tuned-json)"}
 for key, (sp, mp) in MOE.items():
-    name, pt, pa = MODEL[key]
+    name = mname(key, "fp16"); pt, pa = mparams(key)
     single = parse_ab_single(f"{REPO}/{sp}")
     multi = parse_ab_8user(f"{REPO}/{mp}")
     for arm in ("base", "kbest", "auto"):
@@ -141,7 +148,7 @@ for sumf in sorted(glob.glob(f"{REPO}/results/tp_sweep_*/SUMMARY.txt")):
     if len(parts) < 4:
         continue
     key, prec = parts[2], parts[3]
-    name, pt, pa = MODEL.get(key, (key, "", ""))
+    name = mname(key, prec); pt, pa = mparams(key)
     rel = f"results/{dname}/SUMMARY.txt"
     txt = open(sumf).read()
     cell = {}   # (tp, users) -> {"pu":[...], "ag":[...]}
@@ -169,7 +176,7 @@ if os.path.exists(chain):
     parts = re.split(r"────\s*(\S+)\s*────", text)
     for keyprec, body in zip(parts[1::2], parts[2::2]):
         key, _, prec = keyprec.rpartition("_")
-        name, pt, pa = MODEL.get(key, (keyprec, "", ""))
+        name = mname(key, prec); pt, pa = mparams(key)
         for km in re.finditer(
             r"k=(\d+): SPEEDUP off=([0-9.]+) -> mtp=([0-9.]+|nan) tok/s = (\S+) \| "
             r"accept=(\S+) \| EXACTNESS: (\w+)", body):

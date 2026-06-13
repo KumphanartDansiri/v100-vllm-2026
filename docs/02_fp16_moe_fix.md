@@ -48,20 +48,18 @@ is not evidence. The flat `num_stages` sweep saved us from "fixing" the wrong th
 <!-- render:moe_fix -->
 | model | config | users | per-user tok/s | aggregate tok/s |
 |---|---|---|---|---|
-| gemma-4-26B-A4B-it | stock(pre-moe-patch) | 1u | 10.2 | - |
-| Qwen3.6-35B-A3B | stock(pre-moe-patch) | 1u | 15.44 | - |
-| Qwen3.6-35B-A3B | stock(pre-moe-patch) | 1u | 15.56 | - |
-| Qwen3.6-35B-A3B | stock(pre-moe-patch) | 8u | 3.16 | 24.93 |
-| Qwen3.6-35B-A3B | +moe_patch(heuristic) | 1u | 65.91 | - |
-| Qwen3.6-35B-A3B | +moe_patch(heuristic) | 8u | 20.98 | 137.2 |
-| Qwen3.6-35B-A3B | +moe_patch(tuned-json) | 1u | 65.85 | - |
-| Qwen3.6-35B-A3B | +moe_patch(tuned-json) | 8u | 22.8 | 173.92 |
-| gemma-4-26B-A4B-it | stock(pre-moe-patch) | 1u | 10.91 | - |
-| gemma-4-26B-A4B-it | stock(pre-moe-patch) | 8u | 3.58 | 28.3 |
-| gemma-4-26B-A4B-it | +moe_patch(heuristic) | 1u | 43.66 | - |
-| gemma-4-26B-A4B-it | +moe_patch(heuristic) | 8u | 19.1 | 145.15 |
-| gemma-4-26B-A4B-it | +moe_patch(tuned-json) | 1u | 43.71 | - |
-| gemma-4-26B-A4B-it | +moe_patch(tuned-json) | 8u | 20.23 | 155.94 |
+| Qwen/Qwen3.6-35B-A3B | stock(pre-moe-patch) | 1u | 15.56 | - |
+| Qwen/Qwen3.6-35B-A3B | stock(pre-moe-patch) | 8u | 3.16 | 24.93 |
+| Qwen/Qwen3.6-35B-A3B | +moe_patch(heuristic) | 1u | 65.91 | - |
+| Qwen/Qwen3.6-35B-A3B | +moe_patch(heuristic) | 8u | 20.98 | 137.2 |
+| Qwen/Qwen3.6-35B-A3B | +moe_patch(tuned-json) | 1u | 65.85 | - |
+| Qwen/Qwen3.6-35B-A3B | +moe_patch(tuned-json) | 8u | 22.8 | 173.92 |
+| google/gemma-4-26B-A4B-it | stock(pre-moe-patch) | 1u | 10.91 | - |
+| google/gemma-4-26B-A4B-it | stock(pre-moe-patch) | 8u | 3.58 | 28.3 |
+| google/gemma-4-26B-A4B-it | +moe_patch(heuristic) | 1u | 43.66 | - |
+| google/gemma-4-26B-A4B-it | +moe_patch(heuristic) | 8u | 19.1 | 145.15 |
+| google/gemma-4-26B-A4B-it | +moe_patch(tuned-json) | 1u | 43.71 | - |
+| google/gemma-4-26B-A4B-it | +moe_patch(tuned-json) | 8u | 20.23 | 155.94 |
 <!-- endrender -->
 
 Single-stream, the inversion is gone: 35B goes from ~15.6 to **~66 tok/s (≈4×)** and gemma-26B from
@@ -83,12 +81,19 @@ GEMM's default Volta-blind. This is a gap, not a hardware ceiling.
 
 ## Upstreaming
 
-**Prepared for two upstream paths** (drafted; not yet submitted — no links to share yet), framed
-for what each engine will take:
-- **vLLM** (our main engine — we run 0.21 on V100): to be filed as a *finding*, not an sm_70-support
-  PR. The general-interest part: the decode-branch `BLOCK_SIZE_K=128` default may be worth re-checking for
-  small-M even on `cp.async` hardware — we only have V100 evidence, so it's posed as a question, plus
-  the V100 config files as a data contribution.
+The same Volta-blind default sits in **both vLLM 0.19 and 0.21** — `get_default_config` is
+byte-identical (`block_k = 128 if … or M <= 64 else 64`, `num_stages=4` for small-M) in both. That
+matters because **0.19 is the last release with broad official V100 support**, while 0.21's V100 path
+is the source-build-on-cu126 route (Chapter 1). So the fix and the V100 config files are relevant to
+both — and that's where V100 users actually live.
+
+**Prepared for upstream** (drafted; not yet submitted — no links to share yet), framed for what each
+engine will take:
+- **vLLM** (our main engine — we run 0.21 on V100; the bug is identical in 0.19): to be filed as a
+  *finding*, not an sm_70-support PR. The general-interest part: the decode-branch `BLOCK_SIZE_K=128`
+  default may be worth re-checking for small-M even on `cp.async` hardware — we only have V100
+  evidence, so it's posed as a question, plus the V100 config files (valid for 0.19 and 0.21) as a
+  data contribution.
 - **aphrodite-engine** (broad-arch support; where we learned the sm_70 build approach): to be
   submitted as a PR with the full fix including the sm<80 heuristic.
 

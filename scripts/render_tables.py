@@ -30,16 +30,21 @@ def md(headers, lines):
 
 
 def overview():
-    seen, lines = set(), []
+    def row(r):
+        return [r["model"], r["variant"], f"{r['params_total_b']}B/{r['params_active_b']}B",
+                f"TP{r['tp']}", r["tok_s_per_user"], r["ttft_s"] or "-", r["config"]]
+    lines, seen = [], set()
+    # baseline: Ch1 single-user reliability rows (one per checkpoint)
     for r in rows:
-        if r["users"] != "1" or "moe_patch" in r["config"]:
-            continue
-        k = (r["model"], r["variant"])
-        if k in seen:
-            continue
-        seen.add(k)
-        lines.append([r["model"], r["variant"], f"{r['params_total_b']}B/{r['params_active_b']}B",
-                      f"TP{r['tp']}", r["tok_s_per_user"], r["ttft_s"], r["config"]])
+        if r["users"] == "1" and "Ch1 reliability" in r["notes"]:
+            k = (r["model"], r["variant"])
+            if k not in seen:
+                seen.add(k); lines.append(row(r))
+    # + the patched FP16-MoE single-user rows, so the MoE models show non-patch vs patch
+    for r in rows:
+        if r["users"] == "1" and r["config"] == "+moe_patch(tuned-json)":
+            lines.append(row(r))
+    lines.sort(key=lambda x: (x[0], 0 if "stock" in x[6] else 1))  # group by model; stock (non-patch) before +moe_patch
     return md(["model", "prec", "total/active", "TP", "decode tok/s", "TTFT s", "config"], lines)
 
 

@@ -31,6 +31,7 @@ the 54 GB FP16 footprint, TP2 would have a fraction of that KV room.
 | fp8 | TP4 | 8 | fp8-plugin+coalesced | 14.96 | 119.66 | - | results/tp_sweep_q27b_fp8_20260613_110847/SUMMARY.txt |
 | fp8 | TP8 | 1 | fp8-plugin+coalesced | 44.95 | 44.95 | - | results/tp_sweep_q27b_fp8_20260613_110847/SUMMARY.txt |
 | fp8 | TP8 | 8 | fp8-plugin+coalesced | 20.73 | 165.83 | - | results/tp_sweep_q27b_fp8_20260613_110847/SUMMARY.txt |
+| fp8 | TP | 1 | +mtp(k=1) | 26.48 | - | - | results/ch2_mtp_20260612/CHAIN_SUMMARY.txt |
 <!-- endrender -->
 
 ## How to read it

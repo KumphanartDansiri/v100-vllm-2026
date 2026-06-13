@@ -14,7 +14,7 @@
 | variant | TP | users | config | per-user | agg | TTFT | result_path |
 |---|---|---|---|---|---|---|---|
 | fp16 | TP4 | 1 | stock(pre-moe-patch) | 10.2 | - | 0.3 | results/ch1_20260611/ch1.1_021/manifest.csv |
-| fp8 | TP4 | 1 | stock | 46.48 | - | 0.18 | results/ch1_20260611/ch1.1_021/manifest.csv |
+| fp8 | TP4 | 1 | fp8-plugin+coalesced | 46.48 | - | 0.18 | results/ch1_20260611/ch1.1_021/manifest.csv |
 | fp16 | TP4 | 1 | stock(pre-moe-patch) | 10.91 | - | - | results/moe_stages_ab_g26b_20260613_051056/SUMMARY.txt |
 | fp16 | TP4 | 8 | stock(pre-moe-patch) | 3.58 | 28.3 | - | results/moe_stages_ab_g26b_20260613_053254/SUMMARY.txt |
 | fp16 | TP4 | 1 | +moe_patch(heuristic) | 43.66 | - | - | results/moe_stages_ab_g26b_20260613_051056/SUMMARY.txt |
