@@ -1,0 +1,4 @@
+# Generated CSVs (built by scripts/build_matrix_from_results.py via Python's csv module, which
+# emits RFC 4180 CRLF). They are machine-written, not hand-edited, so don't whitespace-lint them —
+# this keeps `git diff --check` clean without an EOL-normalization churn on every regen.
+data/*.csv -whitespace

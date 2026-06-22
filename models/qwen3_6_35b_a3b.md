@@ -25,8 +25,6 @@ activation + half-the-weight-bytes is the V100 sweet spot.
 | 0.21.0/cu126 | fp16 | TP4 | 8 | +moe_patch(heuristic) | 20.98 | 137.2 | - | results/moe_stages_ab_q35b_20260613_053101/SUMMARY.txt |
 | 0.21.0/cu126 | fp16 | TP4 | 1 | +moe_patch(tuned-json) | 65.85 | - | - | results/moe_stages_ab_q35b_20260613_051056/SUMMARY.txt |
 | 0.21.0/cu126 | fp16 | TP4 | 8 | +moe_patch(tuned-json) | 22.8 | 173.92 | - | results/moe_stages_ab_q35b_20260613_053101/SUMMARY.txt |
-| 0.21.0/cu126 | fp8 | TP | 1 | +mtp(k=1) | 66.38 | - | - | results/ch2_mtp_20260612/CHAIN_SUMMARY.txt |
-| 0.21.0/cu126 | fp16 | TP | 1 | +mtp(k=1) | 17.2 | - | - | results/ch2_mtp_20260612/CHAIN_SUMMARY.txt |
 | 0.21.0/cu126 | fp8 | TP4 | 1 | fp8-plugin+coalesced | 74.92 | 74.92 | 14.28 | results/perf_v2_q35b_fp8_021_20260620_183825 |
 | 0.21.0/cu126 | fp8 | TP4 | 2 | fp8-plugin+coalesced | 63.35 | 126.7 | - | results/perf_v2_q35b_fp8_021_20260620_183825 |
 | 0.21.0/cu126 | fp8 | TP4 | 4 | fp8-plugin+coalesced | 58.76 | 235.04 | - | results/perf_v2_q35b_fp8_021_20260620_183825 |

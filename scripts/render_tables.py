@@ -96,7 +96,9 @@ def moe_fix():
 
 
 def model(sub):
-    sel = [r for r in rows if sub.lower() in r["model"].lower()]
+    # Model pages = normal serving configs only. MTP is a separate execution mode (different tok/s
+    # semantics — acceptance/exactness/k) and lives in Chapter 4, so exclude +mtp rows here.
+    sel = [r for r in rows if sub.lower() in r["model"].lower() and not r["config"].startswith("+mtp")]
     if not sel:
         return f"_(no rows match '{sub}' yet — pending measurement)_"
     # show the engine column when a model was measured on >1 vLLM/stack
@@ -111,15 +113,28 @@ def model(sub):
 
 
 def mtp():
-    lines = []
+    # One row per (model, k); Model label folds in Format + Dense/MoE (Qwen3.6-35B-A3B appears as both
+    # FP8 and FP16 — the contrast is the point). Blank-repeat Model (Chapter-2 rowspan look).
+    n_of = lambda n, key: (re.search(rf"{key}=(\S+?)[;\s]", n + " ") or [None, "-"])[1]
+    ex = lambda v: {"EXACT": "Exact", "DIFF": "Diff"}.get(v, v)
+    typ = lambda r: "dense" if r["params_total_b"] == r["params_active_b"] else "MoE"
+    groups, meta = {}, {}
     for r in rows:
         if not r["config"].startswith("+mtp"):
             continue
+        label = f"{short(r['model'])} ({fmt(r['variant'])}, {typ(r)})"
         n = r["notes"]
-        g = lambda k: (re.search(rf"{k}=(\S+?)[;\s]", n + " ") or [None, "-"])[1]
-        lines.append([r["model"], r["variant"], r["config"].replace("+mtp", "").strip("()"),
-                      g("off"), r["tok_s_per_user"], g("speedup"), g("accept"), g("exactness")])
-    return md(["model", "prec", "k", "off tok/s", "mtp tok/s", "speedup", "accept", "exactness"], lines)
+        line = [label, int(r["mtp"]), n_of(n, "off"), r["tok_s_per_user"], n_of(n, "speedup"),
+                n_of(n, "accept"), ex(n_of(n, "exactness"))]
+        groups.setdefault(label, []).append((int(r["mtp"]), line))
+        meta[label] = (float(r["params_total_b"]), 0 if r["variant"] == "fp8" else 1)  # 27<35<122; fp8 before fp16
+    lines = []
+    for label in sorted(groups, key=lambda L: meta[L]):
+        for _, line in sorted(groups[label], key=lambda kl: kl[0]):
+            lines.append(line)
+    _blank_repeat(lines, 0)
+    return md(["Model", "k", "off tok/s", "MTP tok/s", "speedup", "accept", "exactness"],
+              lines, align=["l", "r", "r", "r", "r", "r", "l"])
 
 
 def eager_cudagraph():

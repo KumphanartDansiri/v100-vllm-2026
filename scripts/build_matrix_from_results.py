@@ -198,6 +198,44 @@ if os.path.exists(chain):
                          "result_path": rel,
                          "notes": f"Ch4 MTP; off={offv}; speedup={spd}; accept={acc}; exactness={exact}"})
 
+# ---- Ch4 MTP k>=2 sweep: per-model dirs (single model each, same "k=N: SPEEDUP ..." line format as
+# the chain). dir -> (key, prec, which k's to take) — the k-filter picks the canonical run where a
+# (model,k) was measured in more than one dir (e.g. 122B k=2). k=1 still comes from the chain above.
+MTP_KGE2 = [
+    ("ch2_mtp_k2_slots512_27b",   "q27b",  "fp8", (2,)),
+    ("ch2_mtp2_slots512_35b",     "q35b",  "fp8", (2,)),
+    ("ch2_mtp_k34_slots512_35b",  "q35b",  "fp8", (3, 4)),
+    ("ch2_mtp2_slots512_122b",    "q122b", "fp8", (2,)),   # the 1.45x "breakthrough" k=2 run
+    ("ch2_mtp_k23_slots512_122b", "q122b", "fp8", (3,)),   # k=3 (this dir's k=2 duplicates the line above)
+    ("ch2_mtp_k4_slots512_122b",  "q122b", "fp8", (4,)),
+]
+MTP_LINE = re.compile(
+    r"k=(\d+): SPEEDUP off=([0-9.]+) -> mtp=([0-9.]+|nan) tok/s = (\S+) \| "
+    r"accept=(\S+?)(?:\s*\([^)]*\))? \| EXACTNESS: (\w+)")  # tolerate a trailing "(parser fixed…)" note
+for d, key, prec, ks in MTP_KGE2:
+    dd = f"{REPO}/results/{d}"
+    if not os.path.isdir(dd):
+        continue
+    seen = {}
+    for fn in sorted(glob.glob(f"{dd}/*.txt") + glob.glob(f"{dd}/*.log")):
+        for m in MTP_LINE.finditer(open(fn, errors="ignore").read()):
+            kk = int(m.group(1))
+            if kk in ks and kk not in seen and m.group(3) != "nan":
+                seen[kk] = m.groups()
+    name = mname(key, prec); pt, pa = mparams(key)
+    for kk in ks:
+        if kk not in seen:
+            continue
+        _, offv, mtpv, spd, acc, exact = seen[kk]
+        rows.append({"model": name, "variant": prec, "params_total_b": pt,
+                     "params_active_b": pa, "quant": prec, "vllm_version": "0.21.0",
+                     "torch_cuda": "cu126", "gpu": "V100-32GB", "tp": "",
+                     "max_model_len": 4096, "users": 1, "mode": "cudagraph",
+                     "cudagraph": 1, "mtp": kk, "config": f"+mtp(k={kk})",
+                     "tok_s_per_user": float(mtpv), "tok_s_aggregate": "", "ttft_s": "",
+                     "memory_gb": "", "flags": "skip-mm,ns8", "result_path": f"results/{d}",
+                     "notes": f"Ch4 MTP; off={offv}; speedup={spd}; accept={acc}; exactness={exact}"})
+
 # ---- Ch3 eager-vs-cudagraph: pivot to one row per model (official name), columns
 # eager | cudagraph | improvement(cg/eager). CH3_MODELS tracks all candidate families, but only those
 # with a measured eager+cudagraph pair are emitted (unmeasured families are omitted, not 'pending').

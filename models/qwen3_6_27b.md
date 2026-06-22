@@ -34,7 +34,6 @@ the 54 GB FP16 footprint, TP2 would have a fraction of that KV room.
 | 0.21.0/cu126 | fp8 | TP4 | 8 | fp8-plugin+coalesced | 14.96 | 119.66 | - | results/tp_sweep_q27b_fp8_20260613_110847/SUMMARY.txt |
 | 0.21.0/cu126 | fp8 | TP8 | 1 | fp8-plugin+coalesced | 44.95 | 44.95 | - | results/tp_sweep_q27b_fp8_20260613_110847/SUMMARY.txt |
 | 0.21.0/cu126 | fp8 | TP8 | 8 | fp8-plugin+coalesced | 20.73 | 165.83 | - | results/tp_sweep_q27b_fp8_20260613_110847/SUMMARY.txt |
-| 0.21.0/cu126 | fp8 | TP | 1 | +mtp(k=1) | 26.48 | - | - | results/ch2_mtp_20260612/CHAIN_SUMMARY.txt |
 | 0.21.0/cu126 | fp8 | TP2 | 1 | fp8-plugin+coalesced | 31.69 | 31.69 | 62.35 | results/perf_v2_q27b_fp8_021_20260620_181033 |
 | 0.21.0/cu126 | fp8 | TP2 | 2 | fp8-plugin+coalesced | 23.92 | 47.84 | - | results/perf_v2_q27b_fp8_021_20260620_181033 |
 | 0.21.0/cu126 | fp8 | TP2 | 4 | fp8-plugin+coalesced | 18.82 | 75.28 | - | results/perf_v2_q27b_fp8_021_20260620_181033 |
