@@ -15,11 +15,14 @@ OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
 COLS = ["model", "variant", "params_total_b", "params_active_b", "quant",
         "vllm_version", "torch_cuda", "gpu", "tp", "max_model_len", "users",
         "mode", "cudagraph", "mtp", "config", "tok_s_per_user", "tok_s_aggregate",
-        "ttft_s", "memory_gb", "flags", "result_path", "notes"]
+        "ttft_s", "memory_gb", "flags", "result_path", "notes",
+        "model_type", "consolidated_path", "implementation_ref"]
 
 # Official HF checkpoint id per (model key, quant) — shown verbatim in tables for reproducibility.
 PARAMS = {"q27b": (27, 27), "q35b": (35, 3), "q122b": (122, 10),
-          "g31b": (31, 31), "g26b": (26, 4), "glm": (106, 12)}
+          "g31b": (31, 31), "g26b": (26, 4), "glm": (106, 12), "glm47": (31, 3)}
+TYPE = {"q27b": "Dense", "q35b": "MoE", "q122b": "MoE", "g31b": "Dense",
+        "g26b": "MoE", "glm": "MoE", "glm47": "MLA MoE"}   # archetype (Models-Tested table)
 CHECKPOINT = {
     ("q27b", "fp16"): "Qwen/Qwen3.6-27B",   ("q27b", "fp8"): "Qwen/Qwen3.6-27B-FP8",
     ("q35b", "fp16"): "Qwen/Qwen3.6-35B-A3B", ("q35b", "fp8"): "Qwen/Qwen3.6-35B-A3B-FP8",
@@ -28,11 +31,13 @@ CHECKPOINT = {
     ("g31b", "fp16"): "google/gemma-4-31B-it", ("g31b", "fp8"): "RedHatAI/gemma-4-31B-it-FP8-Dynamic",
     ("g26b", "fp16"): "google/gemma-4-26B-A4B-it", ("g26b", "fp8"): "RedHatAI/gemma-4-26B-A4B-it-FP8-Dynamic",
     ("glm", "fp8"): "zai-org/GLM-4.5-Air-FP8",
+    ("glm47", "fp16"): "zai-org/GLM-4.7-Flash",
 }
 QLABEL = {"int4": "GPTQ-Int4"}  # show the quant method, not bare "int4"
 def mname(key, q): return CHECKPOINT.get((key, q), key)
 def mparams(key): return PARAMS.get(key, ("", ""))
 def qlabel(q): return QLABEL.get(q, q)
+def mtype(key): return TYPE.get(key, "")
 CH1_TP = {"q27b": 4, "q35b": 4, "g26b": 4, "g31b": 4, "q122b": 8}
 rows = []
 
@@ -223,6 +228,74 @@ with open(ch3_out, "w", newline="") as f:
                     "cudagraph_tok_s": cg or "pending", "improvement": imp,
                     "eager_log": eg_log, "cudagraph_log": cg_log})
     print(f"wrote Ch3 eager/cudagraph ({nmeas}/{len(CH3_MODELS)} measured; src={evc_src or 'none'})")
+
+# ---- perf_v2 dual-engine matrix (Tables 1-3 source): 0.19+0.21, FP8/FP16/BF16/Int4, C1-C8 ----
+# From results/perf_v2_COMBINED.csv (reconciled, with per-metric raw-dir provenance). One row per
+# (model,prec,engine,tp) x users in {1,2,4,8}. result_path = the raw decode dir; the frozen impl is
+# stamped via consolidated_path + implementation_ref. Restores glm/glm47/gemma with rigorous dual-
+# engine numbers (the older single-engine/hand-added rows are superseded).
+IMPL_REF = "fp8-v100-2026-matrix"
+PV2_VARIANT = {"q27b4": ("q27b", "same-TP (TP4) precision comparison"),
+               "q35b2": ("q35b", "TP2 half-GPU (reduced max-len)"),
+               "g31b2": ("g31b", "TP2 half-GPU (reduced max-len)"),
+               "g26b2": ("g26b", "TP2 half-GPU (reduced max-len)")}
+PV2_VER = {"021": ("0.21.0", "cu126"), "019": ("0.19.0", "cu126")}
+TF5 = {"g31b", "g26b", "glm47"}   # gemma-4 + GLM-4.7 need transformers-5 (cu128 image on 0.19)
+combined = f"{REPO}/results/perf_v2_COMBINED.csv"
+npv2 = 0
+if os.path.exists(combined):
+    for r in csv.DictReader(open(combined)):
+        if r.get("quality") == "MISSING" or not r.get("dC1"):
+            continue
+        mk, prec, eng = r["model"], r["prec"], r["engine"]
+        base, vnote = PV2_VARIANT.get(mk, (mk, ""))
+        name = mname(base, prec); pt, pa = mparams(base)
+        ver, tc = PV2_VER.get(eng, (eng, ""))
+        if eng == "019" and base in TF5:
+            tc = "cu128"
+        vlabel = "bf16" if base == "glm47" else qlabel(prec)
+        if base == "glm47":
+            cfg = "fp16mla+cudagraph"
+            flags = "mla-prefill,mla-decode-cudagraph,fa-v100" + (",tf5" if eng == "019" else "")
+        elif prec == "fp8":
+            cfg, flags = "fp8-plugin+coalesced", "skip-mm,ns8"
+        elif mtype(base) != "Dense" and prec in ("fp16", "bf16"):
+            cfg, flags = "+moe_patch", "skip-mm,ns8"
+        else:
+            cfg, flags = "stock-vllm", "skip-mm,ns8"
+        if eng == "019" and base in TF5 and base != "glm47":
+            flags += ",tf5"
+        mlen = 8192 if mk.endswith("2") else 32768
+        decode_src = r.get("decode_src", "")
+        for users, col in ((1, "dC1"), (2, "dC2"), (4, "dC4"), (8, "dC8")):
+            pu = r.get(col, "")
+            if pu in ("", None):
+                continue
+            puf = float(pu)
+            agg = float(r["aggC8"]) if (users == 8 and r.get("aggC8")) else round(puf * users, 2)
+            note = f"perf_v2 dual-engine; quality={r.get('quality','')}; exactness={r.get('exactness','')}"
+            if vnote:
+                note += f"; {vnote}"
+            rows.append({"model": name, "variant": vlabel, "params_total_b": pt,
+                         "params_active_b": pa, "quant": vlabel, "vllm_version": ver,
+                         "torch_cuda": tc, "gpu": "V100-32GB", "tp": r.get("tp", ""),
+                         "max_model_len": mlen, "users": users, "mode": "cudagraph",
+                         "cudagraph": 1, "mtp": 0, "config": cfg, "tok_s_per_user": puf,
+                         "tok_s_aggregate": agg,
+                         "ttft_s": r.get("ttft_long_cold_mono", "") if users == 1 else "",
+                         "memory_gb": "", "flags": flags, "result_path": decode_src,
+                         "notes": note, "model_type": mtype(base),
+                         "consolidated_path": "results/perf_v2_COMBINED.csv",
+                         "implementation_ref": IMPL_REF})
+            npv2 += 1
+print(f"perf_v2: {npv2} rows from COMBINED.csv")
+
+# Fill model_type + provenance for EVERY row (SSOT-driven; older sections get type from the name).
+NAME_TYPE = {nm: mtype(k) for (k, q), nm in CHECKPOINT.items()}
+for r in rows:
+    r.setdefault("model_type", NAME_TYPE.get(r["model"], ""))
+    r.setdefault("consolidated_path", "")
+    r.setdefault("implementation_ref", "")
 
 with open(OUT, "w", newline="") as f:
     w = csv.DictWriter(f, fieldnames=COLS)
