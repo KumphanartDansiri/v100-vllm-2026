@@ -20,6 +20,7 @@ This is the comparison contract for the whole series. One rule:
 |---|---|---|---|
 | Qwen/Qwen3.6-27B | 7.13 | 39.09 | 5.48x |
 | Qwen/Qwen3.6-35B-A3B-FP8 | 7.23 | 70.57 | 9.76x |
+| zai-org/GLM-4.7-Flash | 6.0 | 37.2 | 6.20x |
 | Qwen/Qwen3.5-122B-A10B-FP8 | pending | pending | pending |
 | google/gemma-4-31B-it | pending | pending | pending |
 | RedHatAI/gemma-4-26B-A4B-it-FP8-Dynamic | pending | pending | pending |
@@ -27,20 +28,23 @@ This is the comparison contract for the whole series. One rule:
 <!-- endrender -->
 
 Rows marked *pending* await the same paired measurement (one representative serving config per
-family); they're listed so the contract covers the whole fleet, not just the two anchors. Two things
+family); they're listed so the contract covers the whole fleet, not just the three anchors. Two things
 to read off the measured pairs:
 1. **CUDAGraph is 5–10× faster than eager** on the exact same setup. If you benchmark V100 in eager
    and conclude it's too slow, that's the mistake — you measured Python, not the GPU.
-2. **Both measured models run at ~7 tok/s in eager** — a 27B dense and a 35B-A3B MoE, wildly different
-   models, land within 0.1 tok/s of each other. That's the tell: eager decode is bottlenecked on
-   per-step *launch overhead*, not on the model. CUDAGraph removes that overhead, and only then do the
-   models' real speeds (39 vs 71) appear. (The MoE gains more — 9.8× vs 5.5× — because it has more
-   per-step kernel launches for eager to waste and cudagraph to erase.)
+2. **All three measured models run at ~6–7 tok/s in eager** — a 27B dense, a 35B-A3B MoE, and a 31B
+   MLA-MoE (GLM-4.7-Flash), wildly different architectures, land within ~1 tok/s of each other. That's
+   the tell: eager decode is bottlenecked on per-step *launch overhead*, not on the model. CUDAGraph
+   removes that overhead, and only then do the models' real speeds (39 / 71 / 37) appear. (The dense
+   MoE gains most — 9.8× vs 5.5× vs 6.2× — because it has more per-step kernel launches for eager to
+   waste and cudagraph to erase.) For **GLM-4.7-Flash, cudagraph is not optional but mandatory**: its
+   MLA decode is 6 tok/s eager (unusable) and only cudagraph brings it into the usable band.
 
 ## Why this governs every other chapter
 All Chapter 1 / FP8 / model-page numbers are cudagraph; the MoE fix (Ch2) and MTP (Ch4) A/Bs are
 cudagraph-vs-cudagraph. We never compare an eager arm to a cudagraph arm. When you see *any* V100
 number — ours or anyone's — the first question is "eager or cudagraph?"
 
-*Evidence: `results/eager_vs_cudagraph_20260613_121255/` (SUMMARY.csv + per-mode serve logs). Paired
-by construction: identical model/TP/prompt/harness, only `cudagraph_mode` differs.*
+*Evidence: `results/eager_vs_cudagraph_20260613_121255/` (Qwen pairs) and
+`results/glm47_mla_v100_20260615/` (GLM-4.7-Flash eager/cudagraph A/B) — SUMMARY files + per-mode
+serve logs. Paired by construction: identical model/TP/prompt/harness, only `cudagraph_mode` differs.*

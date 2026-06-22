@@ -1,10 +1,11 @@
 # GLM-4.7-Flash (BF16, MLA) — V100 model page
 
-> **Status: pending SSOT refresh.** This page was drafted from earlier GLM-4.7 validation runs
-> (vLLM 0.21 2026-06-15, vLLM 0.19 2026-06-17) and has **not yet been reconciled with the current
-> dual-engine `perf_v2` matrix — the numbers below are superseded.** For current numbers, use
-> Chapter 1 and `data/benchmark_matrix.csv`. **This is the first MLA-attention model to generate
-> on the V100 (`sm_70`) stack.**
+> **Status: RECONCILED with the dual-engine `perf_v2` matrix (2026-06-21).** All decode/TTFT numbers
+> below come from the SSOT (`data/benchmark_matrix.csv`; raw evidence `results/perf_v2_glm47_fp16_*`).
+> **This is the first MLA-attention model to generate on the V100 (`sm_70`) stack.** The earlier
+> dedicated validation run (`results/glm47_mla_v100_20260615`, the eager-vs-cudagraph A/B in
+> Chapter 3) is what proved the unblock and the cudagraph mandate; the headline decode rate here is
+> the standardized matrix.
 
 GLM-4.7-Flash is a **~31B-total / ~3B-active lite-MoE** (`Glm4MoeLiteForCausalLM`, 47 layers,
 64 routed + 1 shared expert, 4 active). Its attention is **MLA** (multi-head latent attention:
@@ -24,7 +25,8 @@ env-gated patches** (decode stays the stock TritonMLA path):
 2. **Decode smem clamp** — TritonMLA's grouped decode kernel requests ~100 KB shared memory for
    GLM's 512+64 latent (over V100's 96 KB); clamp the per-iter KV tile (`BLOCK_N 32→16`), correctness-neutral.
 3. **Decode cudagraph enable** (`VLLM_V100_MLA_DECODE_CUDAGRAPH=1`) — let TritonMLA decode be
-   cudagraph-captured (it was gated off by an unset support flag). **6.0 → ~38 tok/s = 6.2×.**
+   cudagraph-captured (it was gated off by an unset support flag). **6.0 → 37.2 tok/s = 6.2×** (the
+   Chapter 3 eager-vs-cudagraph A/B).
 
 All three work on **both** engines. The A/B's OFF arm (patch disabled) reproduces the blocker
 (`ampere-crash=9`, no output); the ON arm generates cleanly (`ampere-crash=0`).
@@ -44,27 +46,38 @@ the prefill choke point per engine (0.21's dedicated prefill backend vs 0.19's i
 identical method signature). The ai-bond `.so` is torch-ABI-specific, so it is rebuilt per engine
 (torch 2.11 for 0.21, torch 2.10 for 0.19) — the launcher does this automatically.
 
-## Measured — single-stream (cudagraph), both engines
+## Measured — concurrency scan (cudagraph), both engines
 
 <!-- render:model:GLM-4.7-Flash -->
 | vLLM | variant | TP | users | config | per-user | agg | TTFT | result_path |
 |---|---|---|---|---|---|---|---|---|
-| 0.21.0/cu126 | bf16 | TP4 | 1 | fp16mla+cudagraph | 37.2 | 37.2 | - | results/glm47_mla_v100_20260615/cudagraph_ON_SUMMARY.txt |
-| 0.19.0/cu128 | bf16 | TP4 | 1 | fp16mla+cudagraph | 38.80 | 38.80 | 2.06 | results/glm47_mla_019_20260617_144003/SUMMARY.txt |
+| 0.21.0/cu126 | bf16 | TP4 | 1 | fp16mla+cudagraph | 30.97 | 30.97 | 143.12 | results/perf_v2_glm47_fp16_021_20260621_172718 |
+| 0.21.0/cu126 | bf16 | TP4 | 2 | fp16mla+cudagraph | 21.17 | 42.34 | - | results/perf_v2_glm47_fp16_021_20260621_172718 |
+| 0.21.0/cu126 | bf16 | TP4 | 4 | fp16mla+cudagraph | 13.25 | 53.0 | - | results/perf_v2_glm47_fp16_021_20260621_172718 |
+| 0.21.0/cu126 | bf16 | TP4 | 8 | fp16mla+cudagraph | 10.35 | 82.78 | - | results/perf_v2_glm47_fp16_021_20260621_172718 |
+| 0.19.0/cu128 | bf16 | TP4 | 1 | fp16mla+cudagraph | 35.36 | 35.36 | 205.91 | results/perf_v2_glm47_fp16_019_20260622_001738 |
+| 0.19.0/cu128 | bf16 | TP4 | 2 | fp16mla+cudagraph | 27.62 | 55.24 | - | results/perf_v2_glm47_fp16_019_20260622_001738 |
+| 0.19.0/cu128 | bf16 | TP4 | 4 | fp16mla+cudagraph | 21.37 | 85.48 | - | results/perf_v2_glm47_fp16_019_20260622_001738 |
+| 0.19.0/cu128 | bf16 | TP4 | 8 | fp16mla+cudagraph | 17.5 | 140.01 | - | results/perf_v2_glm47_fp16_019_20260622_001738 |
 <!-- endrender -->
 
 ## How to read it
-- **~37–39 tok/s single-stream decode on both engines** — comfortably in the usable band, on the
-  first MLA model to run on V100 at all. 0.19 (38.80) ≈ slightly ahead of 0.21 (37.2); engine-invariant.
-- **TTFT (short prompt) = 2.06 s** (cleanly isolated on the 0.19 streaming run; the 2026-06-15 0.21
-  harness didn't separate TTFT, hence "-").
-- **Long-context TTFT is the open item**: a ~3k-token prompt takes **~31.6 s to first token**. MLA
-  prefill is inherently **eager**, and GLM's MoE shape (`E=64, N=384`) has no tuned Volta config yet,
-  so prefill is the slow part. The *decode* chapter is done; the prefill/TTFT chapter (autotune that
-  MoE JSON) is future work.
-- **Correctness**: numcheck cos = 1.0 (exact attention math), greedy run-to-run **exact**, **7/8**
-  verifiable chat Q&A correct (capital, 17×23=391, exact-token instruction-following, code) — the one
-  miss is a small-reasoning-model miscount, not numerical corruption.
+- **~31 (0.21) / ~35 (0.19) tok/s single-stream decode** — comfortably in the usable band, on the
+  first MLA model to run on V100 at all. Unlike the FP8-plugin models, GLM-4.7-Flash decode is **stock
+  TritonMLA** (not our kernels), so it is **not** engine-invariant: **0.19 wins decode** (35.4 vs 31.0
+  @C1, the fleet-wide pattern), while **0.21 wins prefill** (cold TTFT 143 s vs 206 s).
+- **Concurrency scales modestly** (MLA decode + an untuned MoE shape): per-user 31 → 21 → 13 → 10 on
+  0.21 (agg 83 @C8) and 35 → 28 → 21 → 18 on 0.19 (agg 140 @C8) — **0.19 scales notably better** at
+  load. All streams coherent.
+- **Cold TTFT = 143 s (0.21) / 206 s (0.19)** — cold monolithic prefill at 32k max-len. MLA prefill is
+  inherently **eager** and GLM's MoE shape (`E=64, N=384`) has no tuned Volta config yet, so prefill is
+  the slow part; the *decode* chapter is done, the prefill/TTFT chapter (autotune that MoE JSON) is
+  future work. (A short warm prompt is ~2 s to first token — the cold number is the worst case.)
+- **Correctness**: numcheck cos = 1.0 (exact attention math), greedy run-to-run **Exact** (perf_v2),
+  **7/8** verifiable chat Q&A correct (capital, 17×23=391, exact-token instruction-following, code) —
+  the one miss is a small-reasoning-model miscount, not numerical corruption. The matrix flags
+  `quality=suspect` because its forced-length (`ignore_eos`) protocol trips the reasoning-model
+  repetition caveat below, not because of the MLA path.
 
 ## Caveats
 - **Reasoning model** (`<think>…</think>`, gen-config `temp=1.0`). Coherent + correct at realistic
@@ -74,4 +87,4 @@ identical method signature). The ai-bond `.so` is torch-ABI-specific, so it is r
   natural stop, not `ignore_eos`.
 - **BF16, not FP8** — no FP8 download exists; the FP8 plugin does not engage for this model.
 - The three MLA patches are **experimental, env-gated, local** (sm_70 only); decode rides stock TritonMLA.
-- Numbers are `max-model-len=8192`, TP4. The long-context TTFT above is the untuned-prefill state.
+- Numbers are `max-model-len=32768`, TP4. The cold TTFT above is the untuned-prefill state.

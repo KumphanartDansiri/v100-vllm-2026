@@ -202,7 +202,7 @@ if os.path.exists(chain):
 # eager | cudagraph | improvement(cg/eager); list ALL families (measured filled, others 'pending').
 # Kept SEPARATE from the main matrix so eager numbers can never leak into serving tables.
 # One representative serving config per family. ----
-CH3_MODELS = [("q27b", "fp16"), ("q35b", "fp8"), ("q122b", "fp8"),
+CH3_MODELS = [("q27b", "fp16"), ("q35b", "fp8"), ("glm47", "fp16"), ("q122b", "fp8"),
               ("g31b", "fp16"), ("g26b", "fp8"), ("glm", "fp8")]
 evc = sorted(glob.glob(f"{REPO}/results/eager_vs_cudagraph_*/SUMMARY.csv"))
 meas, evc_src = {}, ""
@@ -210,10 +210,30 @@ if evc:
     evc_src = os.path.relpath(os.path.dirname(evc[-1]), REPO)
     for r in csv.DictReader(open(evc[-1])):
         meas.setdefault((r["model"], r["prec"]), {})[r["mode"]] = (r["decode_tps"], r["result_log"])
+
+# GLM-4.7-Flash's eager/cudagraph pair is a one-off MLA A/B with a different summary format
+# (free-text, not SUMMARY.csv) — extract its short-prompt steady-state tok/s from those files so the
+# Ch3 row stays reproducible (no hand-typed numbers; survives a rebuild).
+G47_DIR = f"{REPO}/results/glm47_mla_v100_20260615"
+def _g47_short_tps(fname):
+    p = os.path.join(G47_DIR, fname)
+    if os.path.exists(p):
+        for ln in open(p):
+            if "[ON/short]" in ln:
+                m = re.search(r"\(([\d.]+) tok/s\)", ln)
+                if m:
+                    return m.group(1), f"results/glm47_mla_v100_20260615/{fname}"
+    return ("", "")
+_g47e = _g47_short_tps("eager_SUMMARY.txt")
+_g47c = _g47_short_tps("cudagraph_ON_SUMMARY.txt")
+if _g47e[0] and _g47c[0]:
+    meas[("glm47", "fp16")] = {"eager": _g47e, "cudagraph": _g47c}
+
 ch3_out = os.path.join(os.path.dirname(OUT), "eager_vs_cudagraph.csv")
 with open(ch3_out, "w", newline="") as f:
+    # LF line endings (the repo convention for hand-reviewed files); csv defaults to CRLF.
     w = csv.DictWriter(f, fieldnames=["model", "eager_tok_s", "cudagraph_tok_s", "improvement",
-                                      "eager_log", "cudagraph_log"])
+                                      "eager_log", "cudagraph_log"], lineterminator="\n")
     w.writeheader()
     nmeas = 0
     for key, prec in CH3_MODELS:
