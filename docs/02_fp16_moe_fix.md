@@ -46,20 +46,16 @@ is not evidence. The flat `num_stages` sweep saved us from "fixing" the wrong th
 ## The fix and the result
 
 <!-- render:moe_fix -->
-| model | config | users | per-user tok/s | aggregate tok/s |
-|---|---|---|---|---|
-| Qwen/Qwen3.6-35B-A3B | stock(pre-moe-patch) | 1u | 15.56 | - |
-| Qwen/Qwen3.6-35B-A3B | stock(pre-moe-patch) | 8u | 3.16 | 24.93 |
-| Qwen/Qwen3.6-35B-A3B | +moe_patch(heuristic) | 1u | 65.91 | - |
-| Qwen/Qwen3.6-35B-A3B | +moe_patch(heuristic) | 8u | 20.98 | 137.2 |
-| Qwen/Qwen3.6-35B-A3B | +moe_patch(tuned-json) | 1u | 65.85 | - |
-| Qwen/Qwen3.6-35B-A3B | +moe_patch(tuned-json) | 8u | 22.8 | 173.92 |
-| google/gemma-4-26B-A4B-it | stock(pre-moe-patch) | 1u | 10.91 | - |
-| google/gemma-4-26B-A4B-it | stock(pre-moe-patch) | 8u | 3.58 | 28.3 |
-| google/gemma-4-26B-A4B-it | +moe_patch(heuristic) | 1u | 43.66 | - |
-| google/gemma-4-26B-A4B-it | +moe_patch(heuristic) | 8u | 19.1 | 145.15 |
-| google/gemma-4-26B-A4B-it | +moe_patch(tuned-json) | 1u | 43.71 | - |
-| google/gemma-4-26B-A4B-it | +moe_patch(tuned-json) | 8u | 20.23 | 155.94 |
+| Model | Users | Config | Per-user<br>(tok/s) | Aggregate<br>(tok/s) | Improvement |
+|---|---:|---|---:|---:|---:|
+| Qwen/Qwen3.6-35B-A3B | 1 | Stock | 15.56 | - | baseline |
+|  |  | MoE patch | 65.85 | - | 4.2x |
+|  | 8 | Stock | 3.16 | 24.93 | baseline |
+|  |  | MoE patch | 22.8 | 173.92 | 7.0x agg |
+| google/gemma-4-26B-A4B-it | 1 | Stock | 10.91 | - | baseline |
+|  |  | MoE patch | 43.71 | - | 4.0x |
+|  | 8 | Stock | 3.58 | 28.3 | baseline |
+|  |  | MoE patch | 20.23 | 155.94 | 5.5x agg |
 <!-- endrender -->
 
 Single-stream, the inversion is gone: 35B goes from ~15.6 to **~66 tok/s (≈4×)** and gemma-26B from
@@ -69,7 +65,10 @@ approximation). The win *grows with concurrency* because the stock kernel degrad
 
 Two forms ship: a **default-on heuristic** (`BLOCK_SIZE_K=64` for small-M on sm<80 — works for any MoE
 model and any TP with no per-model tuning) and, for the two models we tuned exhaustively, **per-M
-autotuned config files** that add another ~5–10% at concurrency over the heuristic.
+autotuned config files**. The table's **"MoE patch" column is the tuned-json** result (Chapter 2's
+headline uses the best patched config). The default heuristic already captures essentially all of the
+*single-stream* win (35B heuristic 65.91 vs tuned 65.85 — a wash); the tuned files earn their keep at
+*concurrency*: 8-user aggregate 35B 137 → 174, gemma-26B 145 → 156.
 
 ## Why this is a *default* bug, not a "V100 is old" story
 

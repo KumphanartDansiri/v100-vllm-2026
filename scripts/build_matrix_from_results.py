@@ -235,19 +235,20 @@ with open(ch3_out, "w", newline="") as f:
     w = csv.DictWriter(f, fieldnames=["model", "eager_tok_s", "cudagraph_tok_s", "improvement",
                                       "eager_log", "cudagraph_log"], lineterminator="\n")
     w.writeheader()
-    nmeas = 0
+    nmeas, nskip = 0, 0
     for key, prec in CH3_MODELS:
         m = meas.get((key, prec), {})
         eg, eg_log = m.get("eager", ("", ""))
         cg, cg_log = m.get("cudagraph", ("", ""))
-        try:
-            imp = f"{float(cg) / float(eg):.2f}x"; nmeas += 1
-        except (ValueError, ZeroDivisionError):
-            imp = "pending"
-        w.writerow({"model": mname(key, prec), "eager_tok_s": eg or "pending",
-                    "cudagraph_tok_s": cg or "pending", "improvement": imp,
-                    "eager_log": eg_log, "cudagraph_log": cg_log})
-    print(f"wrote Ch3 eager/cudagraph ({nmeas}/{len(CH3_MODELS)} measured; src={evc_src or 'none'})")
+        if not (eg and cg):          # emit ONLY models with a clean eager+cudagraph pair;
+            nskip += 1               # unmeasured families stay in CH3_MODELS and auto-appear when run
+            continue
+        imp = f"{float(cg) / float(eg):.2f}x"
+        nmeas += 1
+        w.writerow({"model": mname(key, prec), "eager_tok_s": eg, "cudagraph_tok_s": cg,
+                    "improvement": imp, "eager_log": eg_log, "cudagraph_log": cg_log})
+    print(f"wrote Ch3 eager/cudagraph ({nmeas} measured, {nskip} unmeasured/omitted; "
+          f"src={evc_src or 'none'})")
 
 # ---- perf_v2 dual-engine matrix (Tables 1-3 source): 0.19+0.21, FP8/FP16/BF16/Int4, C1-C8 ----
 # From results/perf_v2_COMBINED.csv (reconciled, with per-metric raw-dir provenance). One row per

@@ -22,9 +22,13 @@ CSV = os.path.join(BASE, "data", "benchmark_matrix.csv")
 rows = list(csv.DictReader(open(CSV)))
 
 
-def md(headers, lines):
-    out = ["| " + " | ".join(headers) + " |",
-           "|" + "|".join("---" for _ in headers) + "|"]
+def md(headers, lines, align=None):
+    # align: optional per-column 'l'|'r'|'c' list; default (None) = all left, as before.
+    seps = ["|"]
+    for i in range(len(headers)):
+        a = align[i] if align and i < len(align) else "l"
+        seps.append({"r": "---:", "c": ":---:"}.get(a, "---") + "|")
+    out = ["| " + " | ".join(headers) + " |", "".join(seps)]
     out += ["| " + " | ".join(str(c) for c in r) + " |" for r in lines]
     return "\n".join(out)
 
@@ -49,11 +53,46 @@ def overview():
 
 
 def moe_fix():
-    # Only the Ch2 A/B rows (base/kbest/auto, single+8u) — excludes the Ch1 stock duplicate.
-    lines = [[r["model"], r["config"], f"{r['users']}u", r["tok_s_per_user"],
-              r["tok_s_aggregate"] or "-"]
-             for r in rows if "Ch2 MoE fix" in r["notes"]]
-    return md(["model", "config", "users", "per-user tok/s", "aggregate tok/s"], lines)
+    # One row per (model, users) x {Stock, MoE patch}, so each pair is a direct same-model/same-users
+    # A/B. "MoE patch" = the tuned-json config (Ch2's headline uses the best patched result); the
+    # default-on heuristic rows stay in the CSV but are omitted here (the prose covers the nuance).
+    STOCK, TUNED = "stock(pre-moe-patch)", "+moe_patch(tuned-json)"
+    cells, order = {}, []
+    for r in rows:
+        if "Ch2 MoE fix" not in r["notes"] or r["config"] not in (STOCK, TUNED):
+            continue
+        key = (r["model"], r["users"])
+        if key not in cells:
+            cells[key] = {}
+            order.append(key)
+        cells[key][r["config"]] = (r["tok_s_per_user"], r["tok_s_aggregate"] or "-")
+
+    def ratio(num, den, tag=""):
+        try:
+            return f"{float(num) / float(den):.1f}x{tag}"
+        except (ValueError, ZeroDivisionError):
+            return "-"
+
+    lines = []
+    for (mdl, users) in order:
+        c = cells[(mdl, users)]
+        sp = c.get(STOCK, ("-", "-"))
+        tp = c.get(TUNED, ("-", "-"))
+        imp = ratio(tp[1], sp[1], " agg") if users == "8" else ratio(tp[0], sp[0])
+        lines.append([mdl, users, "Stock", sp[0], sp[1], "baseline"])
+        lines.append([mdl, users, "MoE patch", tp[0], tp[1], imp])
+    # rowspan look: blank the repeated Users within each (model, users) pair, then the repeated Model
+    prev = None
+    for ln in lines:
+        k = (ln[0], ln[1])
+        if k == prev:
+            ln[1] = ""
+        else:
+            prev = k
+    _blank_repeat(lines, 0)
+    # Two-line header (Markdown-native via <br>): label on line 1, unit "(tok/s)" on line 2.
+    return md(["Model", "Users", "Config", "Per-user<br>(tok/s)", "Aggregate<br>(tok/s)",
+               "Improvement"], lines, align=["l", "r", "l", "r", "r", "r"])
 
 
 def model(sub):
@@ -88,7 +127,9 @@ def eager_cudagraph():
     if not os.path.exists(p):
         return "_(pending the paired eager-vs-cudagraph run)_"
     rr = list(csv.DictReader(open(p)))
-    lines = [[r["model"], r["eager_tok_s"], r["cudagraph_tok_s"], r["improvement"]] for r in rr]
+    # show only measured pairs (unmeasured families are omitted, not listed as "pending")
+    lines = [[r["model"], r["eager_tok_s"], r["cudagraph_tok_s"], r["improvement"]]
+             for r in rr if r["improvement"] != "pending" and r["eager_tok_s"] != "pending"]
     return md(["model", "eager tok/s", "cudagraph tok/s", "improvement"], lines)
 
 

@@ -21,24 +21,20 @@ This is the comparison contract for the whole series. One rule:
 | Qwen/Qwen3.6-27B | 7.13 | 39.09 | 5.48x |
 | Qwen/Qwen3.6-35B-A3B-FP8 | 7.23 | 70.57 | 9.76x |
 | zai-org/GLM-4.7-Flash | 6.0 | 37.2 | 6.20x |
-| Qwen/Qwen3.5-122B-A10B-FP8 | pending | pending | pending |
-| google/gemma-4-31B-it | pending | pending | pending |
-| RedHatAI/gemma-4-26B-A4B-it-FP8-Dynamic | pending | pending | pending |
-| zai-org/GLM-4.5-Air-FP8 | pending | pending | pending |
 <!-- endrender -->
 
-Rows marked *pending* await the same paired measurement (one representative serving config per
-family); they're listed so the contract covers the whole fleet, not just the three anchors. Two things
-to read off the measured pairs:
+This is **not a fleet census** — it's the clean paired A/Bs we have: same model, same harness, same
+prompt/window, only eager vs cudagraph changes. Two things to read off them:
 1. **CUDAGraph is 5–10× faster than eager** on the exact same setup. If you benchmark V100 in eager
    and conclude it's too slow, that's the mistake — you measured Python, not the GPU.
-2. **All three measured models run at ~6–7 tok/s in eager** — a 27B dense, a 35B-A3B MoE, and a 31B
-   MLA-MoE (GLM-4.7-Flash), wildly different architectures, land within ~1 tok/s of each other. That's
-   the tell: eager decode is bottlenecked on per-step *launch overhead*, not on the model. CUDAGraph
-   removes that overhead, and only then do the models' real speeds (39 / 71 / 37) appear. (The dense
-   MoE gains most — 9.8× vs 5.5× vs 6.2× — because it has more per-step kernel launches for eager to
-   waste and cudagraph to erase.) For **GLM-4.7-Flash, cudagraph is not optional but mandatory**: its
-   MLA decode is 6 tok/s eager (unusable) and only cudagraph brings it into the usable band.
+2. **The gain is model-dependent, and that's the point** — 5.5× for dense Qwen3.6-27B, 9.8× for the
+   Qwen3.6-35B-A3B MoE, 6.2× for the GLM-4.7-Flash MLA-MoE. There's no single multiplier; the common
+   lesson is that **eager decode measures launch overhead as much as model speed.** The tell: all three
+   land at ~6–7 tok/s *in eager* (within ~1 tok/s of each other despite wildly different architectures)
+   — per-step launch overhead dominates — and only once cudagraph replays it away do their real speeds
+   (39 / 71 / 37) appear. The MoE gains most (more per-step kernel launches to erase); for
+   **GLM-4.7-Flash, cudagraph is not optional but mandatory** — 6 tok/s eager is unusable, and only
+   cudagraph brings it into the usable band.
 
 ## Why this governs every other chapter
 All Chapter 1 / FP8 / model-page numbers are cudagraph; the MoE fix (Ch2) and MTP (Ch4) A/Bs are
