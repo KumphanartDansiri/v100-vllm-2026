@@ -70,6 +70,30 @@ two numbers — most "V100 is slow" claims online compare incomparable things.
 A **feasible TP set is per-model** (bounded by fit) — we do NOT report a fixed TP=1,2,4,8 for
 every model; each model page lists only the TP sizes that fit.
 
+## The correctness suite — the 5 standard tests
+Every model × precision × engine cell runs the same fixed five-question probe. **Q1 is the exactness +
+decode anchor** — run **×5** at a long window for self-stability and decode mean/variance; **Q2–Q5** are
+one-shot faithfulness/coherence probes across four categories. The verbatim prompts and per-question
+specs live in the companion repo's `tools/ch1_reliability_bench.sh` (`PROMPT_SPECS` + `prompt_text()`);
+the per-model revisit benches reuse the same five.
+
+| # | Category | reps | max_tokens | Question |
+|---|---|---:|---:|---|
+| **Q1** | **Exactness / self-stability** | **5** | 4096 | *"Write a detailed, multi-section essay on the history, geography, economy, and culture of France. Use clear subsections with headings and develop each at length."* |
+| Q2 | Factual | 1 | 1024 | *"Explain, step by step, how a transformer neural network processes a sentence — from tokenization and embeddings through self-attention and feed-forward layers to the output distribution. Be precise and thorough."* |
+| Q3 | Reasoning | 1 | 1024 | *"A train leaves city A at 9:00 traveling 60 km/h toward city B, 280 km away. A second train leaves city B at 9:30 traveling 80 km/h toward city A on the same line. At what clock time do they meet, and how far from city A? Show every step of your reasoning, then give the final answer."* |
+| Q4 | Structure | 1 | 1024 | *"Summarize the main causes of World War I as exactly five bullet points. Each bullet must be a single sentence. Do not add any text before or after the five bullets."* |
+| Q5 | Code | 1 | 1024 | *"Implement a thread-safe LRU (least-recently-used) cache in Python supporting get(key) and put(key, value) with a fixed capacity. Use only the standard library. Include docstrings and a set of pytest unit tests covering eviction, update, and concurrency."* |
+
+**Shared request parameters:** `temperature=0` (greedy; a reasoning model whose `generation_config`
+wants sampling is run at its configured temperature, which makes Q1 self-stability non-deterministic by
+design), `seed=1234`, `ignore_eos=true`, streaming. `ignore_eos` forces the full `max_tokens` window so
+decode speed is measured over a fixed length — which is *why* a reasoning model can show mild tail
+repetition past its natural stop (a measurement choice, not a model failure).
+
+**How Q1 becomes the exactness label:** the five greedy outputs are hashed — **1 distinct hash = Exact,
+>1 = Stable** — and the same runs give the reported decode mean/stdev.
+
 ## Exactness labels (for correctness, not speed)
 - **Exact:** run-to-run deterministic (identical sha across repeats). The strongest claim.
 - **Stable:** coherent + low repetition, but not bit-identical across precision/config (expected
