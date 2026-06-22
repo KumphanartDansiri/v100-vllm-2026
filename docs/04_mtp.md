@@ -7,6 +7,13 @@ It can speed up decode — but it changes what "tok/s" *means* (output per step 
 acceptance rate), so we measure it in its own chapter and never fold MTP numbers into the base-decode
 comparisons of Chapters 1–3 or the model pages.
 
+**Correctness and exactness are policy choices, not throughput facts.** Every base serving number in
+this write-up is reported *without* MTP, and we do **not** headline MTP-boosted tok/s — because MTP can
+change output exactness. So this chapter is an **operator guide, not a leaderboard**: if your
+application accepts the resulting correctness/exactness trade-off, the sweep below shows where MTP is
+likely to help and which *k* are worth trying. (It's also why the 122B's 1.67× lives here, not as a
+Chapter 1 serving number.)
+
 ## The headline finding: MTP pays only when there's fixed cost to amortize
 
 MTP is **not a universal speed button.** It pays when the decode steps it avoids are expensive enough
@@ -45,7 +52,8 @@ tok/s alone:
   acceptance 88% but *slower* at 0.73× — acceptance was high, speed still lost.)
 - **Exact vs Diff:** dense 27B is bit-exact with MTP (Exact at k=1 and k=2); the MoE models show Diff
   (benign FP nondeterminism in the MoE reduction under the spec-batch shape — happens on stock FP16
-  too, so it exonerates our plugin), output stays coherent.
+  too, so it exonerates our plugin), output stays coherent. **Diff means *different from base decode*,
+  not *wrong*** — whether that's acceptable is the application's call, not a universal verdict.
 - **gemma:** MTP is not supported (`NotImplementedError: Unsupported speculative method 'mtp'`) — an
   honest n/a, not a number.
 
@@ -60,7 +68,9 @@ the fast 35B-A3B FP8 tops out at **k=2** and dense 27B never breaks even — sam
 cost" rule, different amounts of fixed cost to amortize.
 
 ## Takeaway for readers
-Turn MTP **on** when the model is communication-bound at high TP (the 122B case) — and then **tune k**
+**MTP is an optional operating mode, not the default benchmark mode.** Exactness-sensitive deployments
+should stay on base decode; throughput-sensitive ones can use this sweep as a starting point. Concretely:
+turn MTP **on** when the model is communication-bound at high TP (the 122B case) — and then **tune k**
 (122B keeps gaining through k=4). On an already-fast FP8 single-GPU-class decode, leave it off or cap at
 k=2; past the peak it costs more than it returns. And never quote an MTP tok/s next to a base-decode
 tok/s without saying so.
