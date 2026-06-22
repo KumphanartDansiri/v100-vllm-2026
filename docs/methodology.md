@@ -11,12 +11,15 @@ two numbers — most "V100 is slow" claims online compare incomparable things.
 
 ## Hardware & stack
 - **GPU:** Tesla V100-SXM2-32GB (sm_70, Volta), 8× in one box, NVLink.
-- **Engines (dual, on purpose):** we carry **both vLLM 0.21.0 and 0.19.0**, each **built from source
-  on a CUDA 12.6 toolchain** — the prebuilt pip wheels (CUDA ≥12.8 build) drop sm_70, but the source's
-  `<12.8` CMake branch still lists `7.0`, so a cu126 build re-enables V100 with no source patch. We keep
-  both because they win different things: **0.21** lands the newest model architectures first and has
-  fewer compatibility gaps; **0.19** is frequently *faster* on decode and carries sm_70 more broadly.
-  Every FP8 row exists on each (the plugin runs on both). See Chapter 1.
+- **Engines (dual, on purpose):** we carry **both vLLM 0.21.0 and 0.19.0**, **built from source** —
+  the prebuilt pip wheels (CUDA ≥12.8 build) drop sm_70, but a **CUDA 12.6 source build** re-enables
+  V100 with no source patch (the `<12.8` CMake branch still lists `7.0`). The base 0.21 and 0.19 images
+  are cu126; a transformers-5 variant of the 0.19 image is cu128, used only where a newer model needs it
+  (Gemma-4, GLM-4.7-Flash). We keep both engine versions because they win different things: **0.21**
+  lands the newest model architectures first and has fewer compatibility gaps; **0.19** is frequently
+  *faster* on decode and carries sm_70 more broadly. **Most FP8 rows exist on both** engines; the few
+  compatibility exceptions (e.g. Gemma-4-26B FP8 is 0.21-only) are called out in the matrix and model
+  pages. See Chapter 1.
 - **Images / torch:**
   - **0.21:** `vllm-v100:vllm021-cu126` — torch 2.11.0+cu126, Triton 3.6.
   - **0.19 (base):** `vllm-v100-py312:vllm019-cu126` — torch 2.10+cu126.
@@ -37,8 +40,9 @@ two numbers — most "V100 is slow" claims online compare incomparable things.
 
 ## Execution modes — DO NOT cross-compare
 - **eager:** no CUDA graph; every op dispatched from Python per step. Carries large per-step
-  launch overhead → **eager decode numbers are 3–5× lower than cudagraph and are NOT a serving
-  baseline.** We report eager only to isolate kernel behavior, never as headline serving speed.
+  launch overhead → **eager decode runs ~5–10× slower than cudagraph** on the same setup (the measured
+  pairs in Chapter 3) and is **NOT a serving baseline.** We report eager only to isolate kernel
+  behavior, never as headline serving speed.
 - **cudagraph** (`cudagraph_mode=FULL_DECODE_ONLY`): the decode loop is captured into a CUDA
   graph and replayed without Python overhead. **This is the practical serving baseline** and
   what all headline tok/s use unless stated.
@@ -51,7 +55,7 @@ two numbers — most "V100 is slow" claims online compare incomparable things.
   `config` column — `stock(pre-moe-patch)` is the un-tuned vLLM default (pathologically slow,
   Chapter 2); `+moe_patch` is with our Volta fused-MoE fix.
 - **fp8:** our custom W8A16 sm_70 plugin (FP8 weights resident in HBM, dequantized in-kernel to
-  fp16 for the matmul — V100 has no native FP8). `flags=fp8-plugin+coalesced`. Chapter 5.
+  fp16 for the matmul — V100 has no native FP8). `config=fp8-plugin+coalesced`. Chapter 5.
 - **int4:** GPTQ-Int4 (122B only, where FP16 won't fit) — vLLM's Volta-compatible GPTQ path.
 - **config column** values: `stock`, `stock(pre-moe-patch)`, `+moe_patch(heuristic)`,
   `+moe_patch(tuned-json)`. The MoE patch affects **fp16/bf16 MoE only**; dense and our fp8 path
@@ -59,7 +63,7 @@ two numbers — most "V100 is slow" claims online compare incomparable things.
 
 ## "Fits" vs "serves coherently" vs measured speed — three different bars
 1. **Fits:** the model loads into VRAM at a given TP without OOM. Sets the **minimum TP** per
-   model (e.g. 122B-FP8 needs ≥TP4 on 32GB cards; 35B-FP16 needs ≥TP4).
+   model (e.g. 122B-FP8 needs **TP8** on 32GB cards; 35B-FP16 needs **≥TP4**).
 2. **Serves coherently:** it generates correct, non-repetitive text (exactness label below).
 3. **Speed:** the tok/s, only meaningful once 1 and 2 hold.
 
@@ -75,7 +79,7 @@ every model; each model page lists only the TP sizes that fit.
 Note: FP8-vs-FP16 comparisons top out at **Stable** by construction (different math), never Exact.
 
 ## Caveats (stated up front — see README "Known limitations")
-- V100 requires a **source build on CUDA 12.6** (or 12.9); pip wheels won't work.
+- V100 requires a **source build on CUDA 12.6**; pip wheels won't work.
 - The **FP8 plugin is a local/custom** sm_70 kernel, not upstream vLLM.
 - Some **TP cells are infeasible** (model too big at low TP) — shown as absent, not zero.
 - **Vision-encoder** startup profiling can be skipped (`--skip-mm-profiling`) for text-only serving.
