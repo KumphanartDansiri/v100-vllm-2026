@@ -199,7 +199,8 @@ if os.path.exists(chain):
                          "notes": f"Ch4 MTP; off={offv}; speedup={spd}; accept={acc}; exactness={exact}"})
 
 # ---- Ch3 eager-vs-cudagraph: pivot to one row per model (official name), columns
-# eager | cudagraph | improvement(cg/eager); list ALL families (measured filled, others 'pending').
+# eager | cudagraph | improvement(cg/eager). CH3_MODELS tracks all candidate families, but only those
+# with a measured eager+cudagraph pair are emitted (unmeasured families are omitted, not 'pending').
 # Kept SEPARATE from the main matrix so eager numbers can never leak into serving tables.
 # One representative serving config per family. ----
 CH3_MODELS = [("q27b", "fp16"), ("q35b", "fp8"), ("glm47", "fp16"), ("q122b", "fp8"),

@@ -13,7 +13,7 @@ This is the comparison contract for the whole series. One rule:
   the GPU with no Python in the loop. This is how you actually serve, and it's what every headline
   number in this write-up uses. (It works on Volta — which surprises people who assume otherwise.)
 
-## The measured pair (same model, TP, prompt, harness — only the mode changes)
+## The measured pairs (same model, TP, prompt, harness — only the mode changes)
 
 <!-- render:eager_cudagraph -->
 | model | eager tok/s | cudagraph tok/s | improvement |

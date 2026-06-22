@@ -65,7 +65,7 @@ approximation). The win *grows with concurrency* because the stock kernel degrad
 
 Two forms ship: a **default-on heuristic** (`BLOCK_SIZE_K=64` for small-M on sm<80 — works for any MoE
 model and any TP with no per-model tuning) and, for the two models we tuned exhaustively, **per-M
-autotuned config files**. The table's **"MoE patch" column is the tuned-json** result (Chapter 2's
+autotuned config files**. The table's **"MoE patch" rows use the tuned-json** result (Chapter 2's
 headline uses the best patched config). The default heuristic already captures essentially all of the
 *single-stream* win (35B heuristic 65.91 vs tuned 65.85 — a wash); the tuned files earn their keep at
 *concurrency*: 8-user aggregate 35B 137 → 174, gemma-26B 145 → 156.
