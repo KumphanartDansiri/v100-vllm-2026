@@ -11,11 +11,19 @@ two numbers — most "V100 is slow" claims online compare incomparable things.
 
 ## Hardware & stack
 - **GPU:** Tesla V100-SXM2-32GB (sm_70, Volta), 8× in one box, NVLink.
-- **Engine:** vLLM 0.21.0 **built from source on a CUDA 12.6 toolchain** (image
-  `vllm-v100:vllm021-cu126`). The prebuilt pip wheels (CUDA ≥12.8 build) drop sm_70; the
-  source's `<12.8` CMake branch still lists `7.0`, so a cu126 build re-enables V100 with no
-  source patch. See Chapter 1.
-- **Torch:** 2.11.0+cu126. Triton 3.6.
+- **Engines (dual, on purpose):** we carry **both vLLM 0.21.0 and 0.19.0**, each **built from source
+  on a CUDA 12.6 toolchain** — the prebuilt pip wheels (CUDA ≥12.8 build) drop sm_70, but the source's
+  `<12.8` CMake branch still lists `7.0`, so a cu126 build re-enables V100 with no source patch. We keep
+  both because they win different things: **0.21** lands the newest model architectures first and has
+  fewer compatibility gaps; **0.19** is frequently *faster* on decode and carries sm_70 more broadly.
+  Every FP8 row exists on each (the plugin runs on both). See Chapter 1.
+- **Images / torch:**
+  - **0.21:** `vllm-v100:vllm021-cu126` — torch 2.11.0+cu126, Triton 3.6.
+  - **0.19 (base):** `vllm-v100-py312:vllm019-cu126` — torch 2.10+cu126.
+  - **0.19 + transformers 5.x** (`vllm019-tf5`, cu128): required **only** by **Gemma-4** and
+    **GLM-4.7-Flash** (their `model_type` needs transformers ≥ 5; every other model runs on stock 4.57).
+- **Engine + toolchain are recorded per row** in the SSOT (`vllm_version`, `torch_cuda`); the Chapter 1
+  matrix and the model pages show both engines side by side, so a "0.19 vs 0.21" gap is always visible.
 
 ## Metrics
 - **decode tok/s (per-user):** steady-state output tokens/sec for one stream, measured *after*

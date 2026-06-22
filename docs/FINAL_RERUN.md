@@ -1,29 +1,38 @@
-# Final freeze — the one authoritative rerun
+# Final freeze & future refresh
 
-Numbers stay **provisional** (chapters carry a DRAFT banner) until a single coherent rerun at the
-very end, when no experiments remain. This separates durable work (prose, structure, definitions,
-the story) from volatile work (exact figures), and locks the numbers ONCE from one consistent run.
+The numbers are SSOT-driven: prose carries claims/ranges, tables carry exact figures auto-rendered
+from `data/benchmark_matrix.csv`. That separation is what lets a freeze — or a later refresh — be a
+couple of commands plus a read, not a rewrite.
 
-## Why one coherent sweep (not patch-by-cell)
-The current CSV mixes runs from different dates (Ch1 06-11, MoE 06-12/13). For publication, the
-final matrix should come from **one campaign**: same image (`vllm-v100:vllm021-cu126`), same flags,
-clean idle box, all cells — so there are zero "measured under possibly-different conditions"
-caveats. Internal consistency > squeezing the last %.
+## What froze, and on what
+The main matrix is **frozen from the dual-engine `perf_v2` campaign** (2026-06-20/21): the Chapter 1
+matrix and every per-model feasible-TP × concurrency row come from one consistent run set on **both**
+engines — vLLM **0.21** (`vllm-v100:vllm021-cu126`) and **0.19** (`vllm-v100-py312:vllm019-cu126`, plus
+the `vllm019-tf5`/cu128 variant for Gemma-4 / GLM-4.7-Flash) — on a clean idle box, same flags. This
+replaced the earlier single-engine plan (one `vllm021-cu126` campaign) and the date-mixed bring-up
+numbers.
 
-## Freeze procedure (one pass, mostly one command)
-1. **Run the full bench** on a clean box — Ch1 reliability + MoE A/B + MTP + per-model feasible-TP ×
-   concurrency. (Harnesses in the fp8-w8a16-sm70 repo: `ch1_reliability_bench.sh`,
-   `moe_stages_ab_vllm021.sh`, `ch2_mtp_*`, and the TP-sweep harness for model pages.)
+The **A/B chapters keep their own dedicated runs by design** — *not* folded into perf_v2. The MoE fix
+(Ch2), eager-vs-cudagraph (Ch3), and MTP (Ch4) are each a same-harness toggle where only one variable
+changes, so both arms must come from one paired run; mixing them with the perf_v2 serving matrix would
+break the comparison. Each cites its own `result_path`.
+
+## Still open before going public
+- **Flip the DRAFT banners** on the chapters once the prose is settled (the *numbers* are already final).
+- **Publish** on the agreed cadence.
+
+## Future refresh — the procedure (if you re-freeze)
+1. **Run the bench** on a clean idle box, both engines: the perf_v2 matrix harness (per-model TP ×
+   concurrency), plus the Ch2 MoE A/B, Ch3 eager/cudagraph, and Ch4 MTP harnesses if those change.
+   (Harnesses live in the companion `fp8-w8a16-sm70` repo.)
 2. **Rebuild the SSOT:** `python3 scripts/build_matrix_from_results.py` → regenerates
-   `data/benchmark_matrix.csv` from the fresh results.
-3. **Re-render every table:** `python3 scripts/render_tables.py --inject` → all chapter/model
-   tables update from the CSV in one shot.
-4. **Sanity pass:** skim prose for any hardcoded exact figure that drifted (there should be none —
-   prose carries claims/ranges, tables carry exact numbers). Fix the few that exist.
-5. **Flip banners:** remove the DRAFT banner from each chapter (numbers now final).
-6. **Publish:** push repo public, then post chapters on the agreed cadence.
+   `data/benchmark_matrix.csv` and `data/eager_vs_cudagraph.csv` from the fresh results.
+3. **Re-render every table:** `python3 scripts/render_tables.py --inject` → all chapter/model tables
+   update from the CSV in one shot.
+4. **Reconcile the prose:** skim each chapter/model page for figures or framing the new numbers
+   changed. The tables auto-sync; the **prose does not** — when the matrix last moved to perf_v2 the
+   tables re-rendered cleanly but the prose needed a hand pass. Budget for that step; don't skip it.
 
-## The discipline that keeps step 4 cheap
+## The discipline that keeps the refresh cheap
 - **Prose** = claims + ranges robust to ±small drift ("4–9×", "beats dense", "FP8 wins on MoE").
-- **Tables** = exact figures, auto-rendered from the CSV (never hand-typed in prose).
-If you follow this, the final freeze is steps 2–3 (two commands) + a quick read, not a rewrite.
+- **Tables** = exact figures, auto-rendered from the CSV — never hand-typed in prose.
