@@ -54,6 +54,12 @@ separately where it applies.
 7. [Dead ends & lessons](docs/07_dead_ends_and_lessons.md) — the optimizations we measured and
    *didn't* ship (num_stages, FP8 route/scatter, w2, FA-for-ViT, cp.async-imitation), and why that
    makes the wins trustworthy.
+8. [Acknowledgements & upstream feedback](docs/08_acknowledgements.md) — what we built on and what we
+   send back, one page per project:
+   [flash-attention-v100 (ai-bond)](acknowledgements/flash_attention_v100.md) ·
+   [vLLM](acknowledgements/vllm.md) ·
+   [aphrodite-engine](acknowledgements/aphrodite.md) ·
+   [1Cat-vLLM (1CatAI)](acknowledgements/onecat_vllm.md)
 
 ## Status
 
