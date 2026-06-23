@@ -40,19 +40,21 @@ On the **FP8 MoE flagships** the gain *grows* with concurrency:
 | 8 | 23.1→31.1 (1.35×) | 17.6→23.4 (1.33×) |
 
 The grouped-expert path benefits directly as batches fill, so **coalesced wins across the measured
-concurrency range on large MoE** — and these models fit on 8×V100 *only* resident in FP8 (the 122B
-would need ~244 GB in FP16).
+concurrency range on large MoE** — and these models are practical on 8×V100 only as **FP8-resident**
+(the 122B would need ~244 GB in FP16; GLM-Air's FP16-resident path loads but is extremely tight).
 
 ## Dense vs MoE: a split case
-- **Large MoE — settled.** FP8 wins across the measured C1–C8 range (above), engine-matched and
-  engagement-proven. This is the headline V100 result.
+- **Large MoE — settled.** On the sparse-MoE flagships FP8 beats FP16 at *every* measured concurrency
+  (model pages / Chapter 1), and coalesced adds to that across C1–C8 (the table above) — engine-matched
+  and engagement-proven. This is the headline V100 result.
 - **Dense — split, with a known kernel wall at concurrency.** After the branchless dequant, dense FP8
   is *faster* than FP16 at low-user decode — the converter moved Qwen-27B C1 from **39 (just below
   FP16's ~40) to 52** (1.34×, now above it). But the coalesced decode kernel is a **GEMV that
   accumulates each of the M concurrent rows with scalar CUDA-core FMAs** (no tensor cores), so its cost
   scales ~linearly with M, while cuBLAS FP16 rides **tensor cores** that stay nearly flat. On a
-  5120×5120 attention Linear (ms/call) ours runs **0.048 → 0.072 → 0.101 → 0.164** at M=1→8 while
-  cuBLAS is **0.078 → 0.098 → 0.109 → 0.095** — FP8 wins to ~M=4, FP16 takes M=8. Dense models feel it
+  5120×5120 attention Linear (ms/call, the **shipping FP8 path** — the dedicated GEMV at M=1, the
+  batched kernel above) ours runs **0.048 → 0.072 → 0.101 → 0.164** at M=1→8 while cuBLAS is
+  **0.078 → 0.098 → 0.109 → 0.095** — FP8 wins to ~M=4, FP16 takes M=8. Dense models feel it
   because they stream the *whole* weight set every token; MoE sidesteps it via per-token expert
   sparsity. half2, split-K, **and vectorized dequant are all measured *not* to close it** (they shave
   the dequant, but the wall is per-M MAC throughput on CUDA cores). The structural fix is a
