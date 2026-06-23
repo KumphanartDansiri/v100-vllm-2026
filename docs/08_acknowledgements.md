@@ -12,6 +12,18 @@ page below records, in the same place, *what it gave us* and *what we're contrib
 The discipline is the one from Chapter 7: a fix is only worth sending once it's measured. Every
 contribution below carries a reproducer or a number, not just a claim.
 
+## A note on contributing back
+
+I have used open source for years as a consumer and operator; this is my first serious attempt to
+contribute findings back upstream. I may not always know the right channel, format, or maintainer path
+for each project. The intent is gratitude and useful feedback, not drive-by criticism.
+
+If any of these notes fail to reach the right maintainer — or should be reshaped as an issue, PR,
+email, or discussion thread — **please help route them.** The goal is simple: give the relevant
+projects the reproducers, patches, and measurements in a form they can actually use. The prepared
+materials are gathered in [`upstream_feedback/`](../upstream_feedback/) so anyone can see exactly what
+is being offered, and to whom.
+
 ## Foundations (used as published, unchanged)
 We changed nothing in these; they are the ground the rest stands on, and we're grateful for them:
 - **PyTorch** and **Triton** — the tensor runtime and the kernel language the FP8/MoE work is written in.
@@ -42,6 +54,9 @@ We changed nothing in these; they are the ground the rest stands on, and we're g
 | **vLLM** | The FP16-MoE `BLOCK_K=128`-on-Volta root cause (4–9× cost) + two autotuned V100 config JSONs | Diagnostic issue + data-only config contribution | Prepared |
 | **aphrodite-engine** | sm\_70 build re-enable (arch list / EXL3 / Marlin guard) + the MoE heuristic & V100 configs | A small commit series + a PR | Prepared (parked behind the vLLM line) |
 | **1Cat-vLLM** | Cross-checks on the shared MTP CUDA-graph hazard and FA integration shape | Notes / mutual acknowledgement | Documented here |
+
+Each row's prepared packet — reproducers, patches, configs, and a draft message — lives under
+[`upstream_feedback/`](../upstream_feedback/), one self-contained folder per project.
 
 ## Licensing & reuse
 Each dependency keeps its own license — see its project page and upstream repository. The
