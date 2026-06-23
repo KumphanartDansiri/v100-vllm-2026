@@ -13,7 +13,8 @@ ALU-bound. *That*, not an sm_70 hardware floor, was the dense-FP8 decode limiter
 converter — value-identical to the old one (bit-exact across all 256 byte patterns, numtest-green)
 — removes it, and because it is the *canonical* converter, **every FP8 kernel inherited the
 speedup**. The lift is visible even with the coalesced-layout kernels *off* (both columns below are
-the **matched-engine A/B on the shipping vLLM 0.21 stack**, single stream):
+the **matched-engine A/B on the shipping vLLM 0.21 stack**, single stream — the kernels are ours, so
+these deltas are **engine-invariant** and hold on 0.19 too):
 
 | Model (TP=8, vLLM 0.21) | Converter on, coalesced **off** | + Coalesced **on** |
 |---|---:|---:|
@@ -45,18 +46,25 @@ would need ~244 GB in FP16).
 ## Dense vs MoE: a split case
 - **Large MoE — settled.** FP8 wins across the measured C1–C8 range (above), engine-matched and
   engagement-proven. This is the headline V100 result.
-- **Dense — split, and partly open.** FP8 is now *faster* than FP16 at low-user decode after
-  branchless dequant (Qwen-27B C1 39→52, 1.34×), but the **current** dense C8 kernel still trails
-  FP16. We have closed half2 and split-K as measured dead ends; **vectorized FP8 dequant
-  (`prmt`/byte-perm) remains the next NCU-gated hypothesis**. So today's dense rule: FP8 for
-  low-user decode and residency; FP16 still wins dense high-concurrency, pending that kernel
-  question. (Stated as a *current result*, not a structural wall.)
+- **Dense — split, with a known kernel wall at concurrency.** After the branchless dequant, dense FP8
+  is *faster* than FP16 at low-user decode — the converter moved Qwen-27B C1 from **39 (just below
+  FP16's ~40) to 52** (1.34×, now above it). But the coalesced decode kernel is a **GEMV that
+  accumulates each of the M concurrent rows with scalar CUDA-core FMAs** (no tensor cores), so its cost
+  scales ~linearly with M, while cuBLAS FP16 rides **tensor cores** that stay nearly flat. On a
+  5120×5120 attention Linear (ms/call) ours runs **0.048 → 0.072 → 0.101 → 0.164** at M=1→8 while
+  cuBLAS is **0.078 → 0.098 → 0.109 → 0.095** — FP8 wins to ~M=4, FP16 takes M=8. Dense models feel it
+  because they stream the *whole* weight set every token; MoE sidesteps it via per-token expert
+  sparsity. half2, split-K, **and vectorized dequant are all measured *not* to close it** (they shave
+  the dequant, but the wall is per-M MAC throughput on CUDA cores). The structural fix is a
+  **tensor-core / WMMA FP8 decode kernel** (the prefill path already runs WMMA) — a current result, not
+  a permanent ceiling.
 
 ## FP8 vs Int4 (122B, engine-matched on vLLM 0.21)
-Where both formats exist they are **peers**: per-user 58/57 (C1), 47/46 (C2), 41/41 (C4), Int4
-+~15% (C8). A naive comparison that ran Int4 on vLLM 0.18 and FP8 on 0.21 inflated Int4 by ~85% of
-the apparent gap — engine *version*, not format; on the matched 0.21 stack the lead all but
-disappears below C8. FP8 is the **broader fleet** path: GLM-Air and the Gemma FP8 checkpoints have
+Where both formats exist they are **peers** — on the matched 0.21 stack they trade the lead through
+mid-concurrency: per-user **58/57** (C1, Int4 +3%), **46/46** (C2, a tie), **42/41** (C4, FP8 nudges
+ahead), and Int4 pulls clear only at **C8 (+~20%, 37 vs 31)**. A naive comparison that ran Int4 on
+vLLM 0.18 and FP8 on 0.21 inflated Int4 by ~85% of the apparent gap — engine *version*, not format; on
+the matched stack the lead all but disappears below C8. FP8 is the **broader fleet** path: GLM-Air and the Gemma FP8 checkpoints have
 **no GPTQ-Int4 equivalent**, e4m3 is numerically richer than int4, and MTP runs on FP8 but crashes
 on gptq-int4 122B. Int4 is the right pick where a GPTQ checkpoint exists *and* C8 aggregate
 throughput is the sole objective.
@@ -68,6 +76,7 @@ throughput is the sole objective.
   is proven from server logs (zero coalesced-w13 hits with the flag off; w13 + attention-coalescing
   banners with it on), so the deltas are the kernel, not config drift.
 
-*Evidence: `results/coal_ab_q122b_*`, `results/coal_ab_glm_*` (flagship A/B), `results/q122b_int4_v021_*`
-(engine-matched Int4), `results/ch1_20260611/` (single-user matrix). Kernel details + the dense-vs-MoE
-profile in the code repo's `docs/COALESCED_FP8_GEMV.md` and `docs/SESSION_LOG.md`.*
+*Evidence: `results/coal_ab_q122b_*`, `results/coal_ab_glm_*` (flagship A/B), the SSOT's matched 122B
+FP8-vs-Int4 rows (`data/benchmark_matrix.csv`), `results/fp8_vecdq_microbench_20260620/` (the dense
+GEMV-vs-cuBLAS M-scaling + half2/vecdq dead ends), `results/ch1_20260611/` (single-user matrix). Kernel
+details + the dense-vs-MoE profile in the code repo's `docs/COALESCED_FP8_GEMV.md` and `docs/SESSION_LOG.md`.*
