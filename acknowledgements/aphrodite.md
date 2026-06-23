@@ -2,9 +2,9 @@
 
 > **Status: Final** — contribution status as of the freeze; this is the *parked* alternative line.
 
-**Upstream:** **aphrodite-engine** (PygmalionAI, maintained by AlpinDale) — a community vLLM-derived
-serving engine with a deliberately broad hardware-support stance. See the upstream repository for its
-license.
+**Upstream:** **aphrodite-engine** (dphnAI, formerly PygmalionAI; maintained by AlpinDale) — a
+community vLLM-derived serving engine with a deliberately broad hardware-support stance.
+**License: AGPL-3.0.**
 
 ## Why it's here
 Early on we evaluated aphrodite as the engine to **freeze high on** — the "upstream-and-ride"

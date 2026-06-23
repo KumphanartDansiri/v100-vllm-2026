@@ -63,10 +63,9 @@ separately where it applies.
 
 ## Status
 
-This repo reaches a *minimum coherent state* (shared CSV, shared definitions) before the chapter
-posts go live. **Chapter 1 and the SSOT matrix are current** (dual-engine, 7 models, frozen at tag
-`fp8-v100-2026-matrix`); **later chapters and model pages are being reconciled to the same
-dual-engine framing.** Cells we have not measured are shown **absent, never zero**.
+This repo is at the **frozen publication checkpoint**: Chapter 1, Chapters 2–8, and all
+model-family pages are reconciled to the dual-engine SSOT matrix (frozen at tag
+`fp8-v100-2026-matrix`). Cells we have not measured are shown **absent, never zero**.
 
 ## Code
 
