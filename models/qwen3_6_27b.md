@@ -1,27 +1,65 @@
-# Qwen3.6-27B (dense) — V100 model page
+# Qwen3.6-27B (dense — FP16 + FP8) — V100 model-family page
 
-> **Status: DRAFT** — numbers provisional until the final freeze ([../docs/FINAL_RERUN.md](../docs/FINAL_RERUN.md)).
-> Table auto-renders from `data/benchmark_matrix.csv`; perf_v2 includes dual-engine FP16/FP8 same-TP rows plus earlier TP-scaling rows.
+> **Status: DRAFT** — provisional until the final freeze ([../docs/FINAL_RERUN.md](../docs/FINAL_RERUN.md)). Digest tables render from `data/benchmark_matrix.csv` (perf_v2-frozen rows only); the exhaustive raw SSOT table is at the bottom.
 
-A dense 27B. The interesting V100 story here is **memory fit vs TP**, plus a post-breakthrough twist:
-FP8 buys you a lower TP floor **and** — since the branchless E4M3 dequant — **faster low-user decode**
-than FP16 at the same TP (54 vs 40 tok/s C1 on 0.19). FP16 still reclaims the 8-user aggregate (the
-dense CUDA-core-vs-tensor-core wall; see Chapter 5). So dense FP8 is no longer a pure memory play —
-it's a low-concurrency *speed* play too.
+A dense 27B. The V100 story is **memory fit vs TP** plus a post-breakthrough twist: FP8 buys a lower
+TP floor **and** — since the branchless E4M3 dequant — *faster* low-user decode than FP16 at the same
+TP. FP16 reclaims the 8-user aggregate (the dense CUDA-core-vs-tensor-core wall, Chapter 5).
 
-## What fits (32GB cards)
-- **FP16 (~52 GB on disk):** needs **TP≥2** (TP1 is 52 GB ≫ 32 GB).
-- **FP8 (~29 GB on disk, resident):** feasible **TP{2,4,8}** — **TP1 OOMs**, see below.
+## Family / checkpoints
+- `Qwen/Qwen3.6-27B` — FP16 baseline (stock vLLM).
+- `Qwen/Qwen3.6-27B-FP8` — FP8 plugin path.
+- **Compatibility:** runs on vLLM **0.19 and 0.21 stock** (no transformers-5 upgrade); dense, so the
+  MoE patch doesn't apply; the FP8 plugin works on **both engines**. (Chapter 6 matrix.)
 
-## Why FP8 OOMs at TP1 (a useful V100 lesson)
-The FP8 weights are **resident** (~27 GB in HBM, genuinely half of FP16) — *not* dequantized back to
-54 GB. TP1 still OOMs because ~27 GB of weights + KV cache + activations + CUDA/NCCL context +
-cudagraph buffers don't fit one card's ~29 GB budget (`gpu-memory-utilization 0.90`). Proof it's
-resident, not dequantized: KV-cache headroom scales as 1/TP — **183k tokens at TP2 → 745k at TP8
-(≈4×)**, exactly what halving weight-bytes-per-card twice predicts. If FP8 were secretly running at
-the 54 GB FP16 footprint, TP2 would have a fraction of that KV room.
+## Fit / compatibility
+- **FP16 (~52 GB):** needs **TP ≥ 2** (TP1 ≫ 32 GB).
+- **FP8 (~29 GB, resident):** feasible **TP{2, 4, 8}**; **TP1 OOMs** (resident weights + KV + CUDA/NCCL
+  context don't fit one card). Proof it's resident, not dequantized back to 54 GB: KV headroom scales
+  1/TP — **183k tok @TP2 → 745k @TP8**.
+- **Best engine:** 0.19 for decode throughput (faster at every same-TP point); 0.21 also works.
 
-## Measured (cudagraph, both engines)
+## Single-user deployment summary
+*What one stream gets at C1, per engine — the precision/TP choice for a solo user or small lab.*
+
+<!-- render:single_user:qwen3_6_27b -->
+| vLLM | FP16 TP4 | FP8 TP4 | FP8 TP2 |
+|---|---:|---:|---:|
+| 0.19 | 40.05 | 54.35 | 35.13 |
+| 0.21 | 35.37 | 46.13 | 31.69 |
+<!-- endrender -->
+
+Same-card (TP4) **FP8 beats FP16** (54 vs 40 on 0.19); the **half-GPU FP8 TP2** option still serves
+~32–35 tok/s, so you can run 27B on 2 cards and free the other two.
+
+## Concurrency shape
+*At a comparable serving config (same TP), how precision/engine scales C1→C8. Each config has two rows:
+**per-user** = one stream's experience; **aggregate** = total box throughput.*
+
+<!-- render:concurrency:qwen3_6_27b -->
+| Config | Type | C1 | C2 | C4 | C8 |
+|---|---|---:|---:|---:|---:|
+| 0.19 FP16 TP4 | per-user | 40.05 | 31.57 | 31.02 | 30.47 |
+|  | aggregate | 40.05 | 63.14 | 124.08 | 243.76 |
+| 0.19 FP8 TP4 | per-user | 54.35 | 43.0 | 31.68 | 21.91 |
+|  | aggregate | 54.35 | 86.0 | 126.72 | 175.28 |
+| 0.21 FP16 TP4 | per-user | 35.37 | 28.48 | 27.71 | 27.41 |
+|  | aggregate | 35.37 | 56.96 | 110.84 | 219.26 |
+| 0.21 FP8 TP4 | per-user | 46.13 | 37.12 | 28.49 | 20.31 |
+|  | aggregate | 46.13 | 74.24 | 113.96 | 162.45 |
+<!-- endrender -->
+
+FP8 leads per-user through ~C4; **FP16 reclaims the C8 aggregate** (244 vs 175 on 0.19) — the dense
+CUDA-core dequant doesn't scale with batch like cuBLAS tensor cores (Chapter 5).
+
+## Caveats
+- FP8 is **Exact** (deterministic greedy) on both engines; all categories coherent.
+- `max-model-len=32768`; longer contexts shrink KV headroom.
+
+## Raw SSOT rows
+*Rendered directly from `data/benchmark_matrix.csv`, kept for auditability — it includes the earlier
+Ch1 / TP-sweep rows the digests above omit. The digests are the recommended reading; if a digest and
+these rows ever disagree, **the SSOT rows win** and the renderer/prose is fixed.*
 
 <!-- render:model:Qwen3.6-27B -->
 | vLLM | variant | TP | users | config | per-user | agg | TTFT | result_path |
@@ -59,20 +97,3 @@ the 54 GB FP16 footprint, TP2 would have a fraction of that KV room.
 | 0.19.0/cu126 | fp8 | TP4 | 4 | fp8-plugin+coalesced | 31.68 | 126.72 | - | results/perf_v2_q27b4_fp8_019_20260621_184344 |
 | 0.19.0/cu126 | fp8 | TP4 | 8 | fp8-plugin+coalesced | 21.91 | 175.28 | - | results/perf_v2_q27b4_fp8_019_20260621_184344 |
 <!-- endrender -->
-
-## How to read it
-- **FP8 beats FP16 at low concurrency, same TP4** — C1 **54.4 vs 40.1** (0.19), **46.1 vs 35.4**
-  (0.21). FP8 leads **C1–C4**; **FP16 reclaims the 8-user aggregate** (FP16 244 vs FP8 175 agg @C8 on
-  0.19). Same dense wall as gemma-4-31B: our FP8 dequant runs on **CUDA cores** while FP16 reaches
-  cuBLAS **tensor cores** that scale better at batch — a WMMA FP8 decode kernel would close it.
-- **TP is a memory ↔ throughput dial.** TP2 fits FP8 on **2 cards** (~32–35 tok/s C1) — run independent
-  replicas for max aggregate; TP4 is the best single-model decode point. Dense decode is
-  bandwidth-bound, so more cards = more aggregate HBM bandwidth feeding the same weights.
-- **0.19 is faster than 0.21** on decode at every same-TP point (the fleet-wide pattern), FP8 and FP16
-  alike.
-
-## Caveats
-- FP8 is **Exact** (deterministic greedy) on both engines; all categories coherent.
-- Numbers are `max-model-len=32768`; longer contexts shrink KV headroom. The TP8 rows are the earlier
-  pre-breakthrough TP-sweep (kept for the TP-scaling shape); the same-TP FP8/FP16 comparison uses the
-  perf_v2 TP4 rows.

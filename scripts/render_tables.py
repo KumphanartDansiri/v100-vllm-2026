@@ -248,6 +248,76 @@ def engine_matrix(ver):                # Tables 3/4: full per-engine decode + co
                "Cold TTFT", "Notes"], lines)
 
 
+# ---- Chapter-6 digest views: curated, FROZEN (perf_v2-only) render views per model family ------
+# A digest NEVER selects legacy Ch1/TP-sweep rows — only implementation_ref == fp8-v100-2026-matrix.
+# One shared per-family config list drives both: single_user pivots it to columns, concurrency to rows.
+PV2 = "fp8-v100-2026-matrix"
+DIGEST_SPECS = {
+    "qwen3_6_27b": {
+        "match": "Qwen3.6-27B",
+        "engines": ["0.19.0", "0.21.0"],
+        "configs": [("FP16 TP4", "fp16", "4"), ("FP8 TP4", "fp8", "4"),
+                    ("FP8 TP2", "fp8", "2", "single_user")],   # half-GPU = a fit option, not scaling
+    },
+    "qwen3_6_35b_a3b": {
+        "match": "Qwen3.6-35B-A3B",
+        "engines": ["0.19.0", "0.21.0"],
+        "configs": [("FP16 TP4", "fp16", "4"), ("FP8 TP4", "fp8", "4"),
+                    ("FP8 TP2", "fp8", "2", "single_user")],   # half-GPU = a fit option, not scaling
+    },
+}
+
+
+def _digest_row(match, eng, variant, tp, users):
+    for r in rows:
+        if (r["implementation_ref"] == PV2 and match in r["model"] and r["vllm_version"] == eng
+                and r["variant"] == variant and r["tp"] == tp and r["users"] == users):
+            return r
+    return None
+
+
+def _eng(v):
+    return v[:-2] if v.endswith(".0") else v   # 0.19.0 -> 0.19
+
+
+def _cfg(c):                           # (label, variant, tp, [flag]) -> (label, variant, tp, su_only)
+    return c[0], c[1], c[2], (len(c) > 3 and c[3] == "single_user")
+
+
+def single_user(key):                  # C1 deployment summary: engine rows x config columns (all configs)
+    s = DIGEST_SPECS[key]
+    cfgs = [_cfg(c) for c in s["configs"]]
+    lines = []
+    for eng in s["engines"]:
+        row = [_eng(eng)]
+        for lbl, var, tp, _ in cfgs:
+            r = _digest_row(s["match"], eng, var, tp, "1")
+            row.append(r["tok_s_per_user"] if r else "—")
+        lines.append(row)
+    return md(["vLLM"] + [c[0] for c in cfgs], lines, align=["l"] + ["r"] * len(cfgs))
+
+
+def concurrency(key):                  # same-TP scaling: per-config per-user/aggregate x C1/C2/C4/C8
+    s = DIGEST_SPECS[key]
+    lines = []
+    for eng in s["engines"]:
+        for lbl, var, tp, su_only in (_cfg(c) for c in s["configs"]):
+            if su_only:                # half-GPU / fit options belong in the single-user table, not here
+                continue
+            pu = [f"{_eng(eng)} {lbl}", "per-user"]
+            ag = ["", "aggregate"]
+            seen = False
+            for u in ("1", "2", "4", "8"):
+                r = _digest_row(s["match"], eng, var, tp, u)
+                pu.append(r["tok_s_per_user"] if r else "—")
+                ag.append((r["tok_s_aggregate"] or "—") if r else "—")
+                seen = seen or bool(r)
+            if seen:                   # skip configs not measured on this engine
+                lines += [pu, ag]
+    return md(["Config", "Type", "C1", "C2", "C4", "C8"], lines,
+              align=["l", "l", "r", "r", "r", "r"])
+
+
 def resolve(cmd):
     cmd = cmd.strip()
     if cmd == "overview":
@@ -268,6 +338,10 @@ def resolve(cmd):
         return engine_matrix("0.21.0")
     if cmd.startswith("model:"):
         return model(cmd.split(":", 1)[1])
+    if cmd.startswith("single_user:"):
+        return single_user(cmd.split(":", 1)[1])
+    if cmd.startswith("concurrency:"):
+        return concurrency(cmd.split(":", 1)[1])
     return f"_(unknown render command: {cmd})_"
 
 
