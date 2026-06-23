@@ -18,28 +18,30 @@ Which runtime each model needs, and which of our patches apply. *Stock* = unmodi
 plugin** and the **MoE patch** are the companion `fp8-w8a16-sm70` package.
 
 One row per official checkpoint, grouped by family.
+**Legend:** ✓ = works / applies · — = not needed or not applicable · *note text* = special requirement
+or limitation (footnoted). Under **MoE patch**, ✓ = required for usable FP16-MoE decode (Chapter 2).
 
-| Official model / checkpoint | vLLM 0.19<br>stock | vLLM 0.19<br>+ transformers 5 | vLLM 0.21<br>stock¹ | MoE patch | FP8 plugin |
-|---|---|---|---|---|---|
+| Official model / checkpoint | 0.19<br>stock | 0.19<br>+ tf5 | 0.21<br>stock¹ | MoE<br>patch | FP8<br>plugin |
+|---|:--:|:--:|:--:|:--:|:--:|
 | **Qwen3.6-27B family** |  |  |  |  |  |
-| `Qwen/Qwen3.6-27B` | Works | not needed | Works | — dense | N/A |
-| `Qwen/Qwen3.6-27B-FP8` | Works | not needed | Works | — dense | Works, both engines |
+| `Qwen/Qwen3.6-27B` | ✓ | — | ✓ | — | — |
+| `Qwen/Qwen3.6-27B-FP8` | ✓ | — | ✓ | — | ✓ |
 | **Qwen3.6-35B-A3B family** |  |  |  |  |  |
-| `Qwen/Qwen3.6-35B-A3B` | Works | not needed | Works | required for fast FP16 MoE | N/A |
-| `Qwen/Qwen3.6-35B-A3B-FP8` | Works | not needed | Works | — FP8 path | Works, both engines |
+| `Qwen/Qwen3.6-35B-A3B` | ✓ | — | ✓ | ✓ | — |
+| `Qwen/Qwen3.6-35B-A3B-FP8` | ✓ | — | ✓ | — | ✓ |
 | **Qwen3.5-122B-A10B family** |  |  |  |  |  |
-| `Qwen/Qwen3.5-122B-A10B-FP8` | Works | not needed | Works | — FP8 path | Works, both engines |
-| `Qwen/Qwen3.5-122B-A10B-GPTQ-Int4` | Works | not needed | Works | — Int4 path | N/A |
+| `Qwen/Qwen3.5-122B-A10B-FP8` | ✓ | — | ✓ | — | ✓ |
+| `Qwen/Qwen3.5-122B-A10B-GPTQ-Int4` | ✓ | — | ✓ | — | — |
 | **gemma-4-31B family** |  |  |  |  |  |
-| `google/gemma-4-31B-it` | needs tf5 | Works | Works | — dense | N/A |
-| `RedHatAI/gemma-4-31B-it-FP8-Dynamic` | needs tf5 | Works | Works | — dense | Works, both engines |
+| `google/gemma-4-31B-it` | needs tf5 | ✓ | ✓ | — | — |
+| `RedHatAI/gemma-4-31B-it-FP8-Dynamic` | needs tf5 | ✓ | ✓ | — | ✓ |
 | **gemma-4-26B-A4B family** |  |  |  |  |  |
-| `google/gemma-4-26B-A4B-it` | needs tf5 | Works | Works | required for fast FP16 MoE | N/A |
-| `RedHatAI/gemma-4-26B-A4B-it-FP8-Dynamic` | needs tf5 | FP8 MoE path errors² | Works | — FP8 path | **0.21 only**² |
+| `google/gemma-4-26B-A4B-it` | needs tf5 | ✓ | ✓ | ✓ | — |
+| `RedHatAI/gemma-4-26B-A4B-it-FP8-Dynamic` | needs tf5 | errors² | ✓ | — | 0.21 only² |
 | **GLM-4.5-Air family** |  |  |  |  |  |
-| `zai-org/GLM-4.5-Air-FP8` | Works | not needed | Works | — FP8 path³ | Works, both engines |
+| `zai-org/GLM-4.5-Air-FP8` | ✓ | — | ✓ | —³ | ✓ |
 | **GLM-4.7-Flash family** |  |  |  |  |  |
-| `zai-org/GLM-4.7-Flash` | needs tf5 + MLA⁴ | Works (tf5 + MLA⁴) | MLA patches⁴ | — BF16 MLA | no FP8 checkpoint |
+| `zai-org/GLM-4.7-Flash` | needs tf5⁴ | ✓⁴ | ✓⁴ | — | — |
 
 ¹ The 0.21 base image already ships **transformers 5.x**, so Gemma-4 / GLM-4.7-Flash run on it with no
 separate upgrade — the tf5 step is a 0.19-only thing (0.19's base is transformers 4.57).
