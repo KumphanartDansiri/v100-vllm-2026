@@ -1,10 +1,11 @@
-# Chapter 6 — Model pages
+# Chapter 6 — Model-family pages
 
-Chapter 1 gives the fleet matrix; these pages are the per-model deployment notes — reach for them when
-you want to know what TP fits, which engine/image to use, what precision is worth serving, and what
-caveats apply.
+Chapter 1 gives the fleet matrix; these **model-family pages** are the per-family deployment notes —
+each covers the official checkpoints in that family (typically an FP16/BF16 baseline and an FP8/Int4
+sibling). Reach for them when you want to know what TP fits, which engine/image to use, what precision
+is worth serving, and what caveats apply.
 
-## How to read a model page
+## How to read a model-family page
 - **Headline numbers are base cudagraph decode, not MTP** (MTP is Chapter 4).
 - **TP is fit-bounded** — an absent TP row means *not measured / not feasible*, not zero.
 - **FP8 rows use the companion V100 plugin** unless noted; FP16/BF16 is stock vLLM.
@@ -16,15 +17,29 @@ caveats apply.
 Which runtime each model needs, and which of our patches apply. *Stock* = unmodified vLLM; the **FP8
 plugin** and the **MoE patch** are the companion `fp8-w8a16-sm70` package.
 
-| Official checkpoint(s) | vLLM 0.19 stock | vLLM 0.19 + transformers 5 | vLLM 0.21 stock¹ | MoE patch | FP8 plugin |
+One row per official checkpoint, grouped by family.
+
+| Official model / checkpoint | vLLM 0.19<br>stock | vLLM 0.19<br>+ transformers 5 | vLLM 0.21<br>stock¹ | MoE patch | FP8 plugin |
 |---|---|---|---|---|---|
-| `Qwen/Qwen3.6-27B` (+ `-FP8`) | Works | not needed | Works | — (dense) | Works, both engines |
-| `Qwen/Qwen3.6-35B-A3B` (+ `-FP8`) | Works | not needed | Works | required for fast FP16 MoE | Works, both engines |
-| `Qwen/Qwen3.5-122B-A10B-FP8` (+ `-GPTQ-Int4`) | Works | not needed | Works | — (no FP16 path) | Works, both engines |
-| `google/gemma-4-31B-it` (+ RedHatAI `-FP8`) | needs tf5 | Works | Works | — (dense) | Works, both engines |
-| `google/gemma-4-26B-A4B-it` (+ RedHatAI `-FP8`) | needs tf5 | FP16 works; FP8 MoE path errors | Works | required for FP16 MoE | **0.21 only**² |
-| `zai-org/GLM-4.5-Air-FP8` | Works | not needed | Works | — (FP8 path)³ | Works, both engines |
-| `zai-org/GLM-4.7-Flash` | needs tf5 + MLA patches⁴ | Works (tf5 + MLA patches) | Works (MLA patches⁴) | — (BF16 MLA) | no FP8 checkpoint |
+| **Qwen3.6-27B family** |  |  |  |  |  |
+| `Qwen/Qwen3.6-27B` | Works | not needed | Works | — dense | N/A |
+| `Qwen/Qwen3.6-27B-FP8` | Works | not needed | Works | — dense | Works, both engines |
+| **Qwen3.6-35B-A3B family** |  |  |  |  |  |
+| `Qwen/Qwen3.6-35B-A3B` | Works | not needed | Works | required for fast FP16 MoE | N/A |
+| `Qwen/Qwen3.6-35B-A3B-FP8` | Works | not needed | Works | — FP8 path | Works, both engines |
+| **Qwen3.5-122B-A10B family** |  |  |  |  |  |
+| `Qwen/Qwen3.5-122B-A10B-FP8` | Works | not needed | Works | — FP8 path | Works, both engines |
+| `Qwen/Qwen3.5-122B-A10B-GPTQ-Int4` | Works | not needed | Works | — Int4 path | N/A |
+| **gemma-4-31B family** |  |  |  |  |  |
+| `google/gemma-4-31B-it` | needs tf5 | Works | Works | — dense | N/A |
+| `RedHatAI/gemma-4-31B-it-FP8-Dynamic` | needs tf5 | Works | Works | — dense | Works, both engines |
+| **gemma-4-26B-A4B family** |  |  |  |  |  |
+| `google/gemma-4-26B-A4B-it` | needs tf5 | Works | Works | required for fast FP16 MoE | N/A |
+| `RedHatAI/gemma-4-26B-A4B-it-FP8-Dynamic` | needs tf5 | FP8 MoE path errors² | Works | — FP8 path | **0.21 only**² |
+| **GLM-4.5-Air family** |  |  |  |  |  |
+| `zai-org/GLM-4.5-Air-FP8` | Works | not needed | Works | — FP8 path³ | Works, both engines |
+| **GLM-4.7-Flash family** |  |  |  |  |  |
+| `zai-org/GLM-4.7-Flash` | needs tf5 + MLA⁴ | Works (tf5 + MLA⁴) | MLA patches⁴ | — BF16 MLA | no FP8 checkpoint |
 
 ¹ The 0.21 base image already ships **transformers 5.x**, so Gemma-4 / GLM-4.7-Flash run on it with no
 separate upgrade — the tf5 step is a 0.19-only thing (0.19's base is transformers 4.57).
@@ -35,7 +50,7 @@ headline FP8 win is the routed-expert kernels, not the patch.
 ⁴ MLA models load on stock Volta but **crash on the first token** (Ampere-only MLA prefill); the
 env-gated MLA patches (local, sm_70) unblock it on either engine. Decode rides stock TritonMLA.
 
-## Pages
+## Family pages
 - [Qwen3.6-27B](../models/qwen3_6_27b.md) — dense; FP8 low-user speed win, FP16 takes high concurrency.
 - [Qwen3.6-35B-A3B](../models/qwen3_6_35b_a3b.md) — the clean MoE FP8 showcase (FP8 wins every concurrency).
 - [Qwen3.5-122B-A10B](../models/qwen3_5_122b_a10b.md) — flagship; FP8 vs GPTQ-Int4 at TP8.
