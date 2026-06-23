@@ -16,7 +16,7 @@ speedup**. The lift is visible even with the coalesced-layout kernels *off* (bot
 the **matched-engine A/B on the shipping vLLM 0.21 stack**, single stream — the kernels are ours, so
 these deltas are **engine-invariant** and hold on 0.19 too):
 
-| Model (TP=8, vLLM 0.21) | Converter on, coalesced **off** | + Coalesced **on** |
+| Model (TP=8, vLLM 0.21) | Converter on<br>Coalesced **off** | Converter on<br>Coalesced **on** |
 |---|---:|---:|
 | Qwen3.5-122B-A10B-FP8 | 51.8 | 57.0 |
 | GLM-4.5-Air-FP8 | 57.8 | 65.2 |
