@@ -1,6 +1,6 @@
 # Chapter 3 — CUDAGraph & baselines: what number is even fair to quote?
 
-> **Status: DRAFT** — numbers provisional until the final freeze ([FINAL_RERUN.md](FINAL_RERUN.md)). Table auto-renders from `data/eager_vs_cudagraph.csv`.
+> **Status: Final** — numbers frozen at the SSOT; table auto-renders from `data/eager_vs_cudagraph.csv`. Refresh procedure: [FINAL_RERUN.md](FINAL_RERUN.md).
 
 This is the comparison contract for the whole series. One rule:
 
@@ -16,7 +16,7 @@ This is the comparison contract for the whole series. One rule:
 ## The measured pairs (same model, TP, prompt, harness — only the mode changes)
 
 <!-- render:eager_cudagraph -->
-| model | eager tok/s | cudagraph tok/s | improvement |
+| Model | Eager tok/s | Cudagraph tok/s | Improvement |
 |---|---|---|---|
 | Qwen/Qwen3.6-27B | 7.13 | 39.09 | 5.48x |
 | Qwen/Qwen3.6-35B-A3B-FP8 | 7.23 | 70.57 | 9.76x |

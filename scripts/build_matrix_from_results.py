@@ -15,8 +15,19 @@ OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
 COLS = ["model", "variant", "params_total_b", "params_active_b", "quant",
         "vllm_version", "torch_cuda", "gpu", "tp", "max_model_len", "users",
         "mode", "cudagraph", "mtp", "config", "tok_s_per_user", "tok_s_aggregate",
-        "ttft_s", "memory_gb", "flags", "result_path", "notes",
+        "ttft_s", "ttft_prefix_hit_s", "ttft_fa_cold_s", "memory_gb", "flags", "result_path", "notes",
         "model_type", "consolidated_path", "implementation_ref"]
+# TTFT semantics (all chunked-prefill ON — the project-standard serve; disabling it is a
+# proven crash-causer on V100, so there is no "monolithic chunked-OFF" number):
+#   ttft_s            = COLD first-token: a fresh cache-cold request prefilling the full ~22.6k-token
+#                       prompt (single unique send -> guaranteed cache miss) = worst case.
+#   ttft_prefix_hit_s = PREFIX-CACHE-HIT first-token: the same prompt with its prefix already cached
+#                       (repeated / shared context) = best case. (NOT a warm-server cold-prompt number.)
+#   ttft_fa_cold_s    = COLD first-token with the V100 FlashAttention prefill backend (FA-eligible
+#                       MHA/GQA models on 0.21 only; "" otherwise).
+# All three come from ONE coherent perf_v2 sweep (results/perf_v2_COMBINED.csv, the 2026-06-21
+# 'ttftboth' matrix run) — same serve config as the decode matrix. The older scattered cold-mono
+# column is NOT used (its repeated-prompt min under-reports MoE cold prefill by ~5x).
 
 # Official HF checkpoint id per (model key, quant) — shown verbatim in tables for reproducibility.
 PARAMS = {"q27b": (27, 27), "q35b": (35, 3), "q122b": (122, 10),
@@ -327,6 +338,12 @@ if os.path.exists(combined):
             flags += ",tf5"
         mlen = 8192 if mk.endswith("2") else 32768
         decode_src = r.get("decode_src", "")
+        # Cold first-token = the single-unique-send full cold prefill (ttft_long_cold_chunk),
+        # NOT the scattered cold-mono min (which under-reports MoE). Prefix-hit + FA from the
+        # same sweep. Only attached to the C1 (users==1) row — TTFT is a single-stream metric.
+        cold = r.get("ttft_long_cold_chunk", "")
+        warm = r.get("ttft_long_warm", "")
+        fa = r.get("ttft_long_cold_fa", "")
         for users, col in ((1, "dC1"), (2, "dC2"), (4, "dC4"), (8, "dC8")):
             pu = r.get(col, "")
             if pu in ("", None):
@@ -342,7 +359,9 @@ if os.path.exists(combined):
                          "max_model_len": mlen, "users": users, "mode": "cudagraph",
                          "cudagraph": 1, "mtp": 0, "config": cfg, "tok_s_per_user": puf,
                          "tok_s_aggregate": agg,
-                         "ttft_s": r.get("ttft_long_cold_mono", "") if users == 1 else "",
+                         "ttft_s": cold if users == 1 else "",
+                         "ttft_prefix_hit_s": warm if users == 1 else "",
+                         "ttft_fa_cold_s": fa if users == 1 else "",
                          "memory_gb": "", "flags": flags, "result_path": decode_src,
                          "notes": note, "model_type": mtype(base),
                          "consolidated_path": "results/perf_v2_COMBINED.csv",

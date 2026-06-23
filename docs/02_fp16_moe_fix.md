@@ -1,6 +1,6 @@
 # Chapter 2 — The FP16 MoE bug: vLLM leaves 4–9× on the floor on V100
 
-> **Status: DRAFT** — numbers provisional until the final freeze ([FINAL_RERUN.md](FINAL_RERUN.md)). Tables auto-render from `data/benchmark_matrix.csv`.
+> **Status: Final** — numbers frozen at the SSOT; tables auto-render from `data/benchmark_matrix.csv`. Refresh procedure: [FINAL_RERUN.md](FINAL_RERUN.md).
 
 If you run a Mixture-of-Experts model in FP16 on a V100 with stock vLLM, it is **slower than a
 dense model of similar size** — which is backwards. A sparse MoE only activates a few experts per
@@ -12,7 +12,7 @@ one-file change recovers **4–9×**.
 
 Same engine, same box (8×V100-32GB, vLLM 0.21 built for CUDA 12.6, cudagraph), just MoE vs dense:
 
-| model | stock FP16 | a *dense* model of similar class |
+| Model | Stock FP16 | A *dense* model of similar class |
 |---|---|---|
 | Qwen3.6-35B-A3B (only 3B active) | ~15.5 tok/s | Qwen3.6-27B dense ≈ 37–41 tok/s |
 | gemma-4-26B-A4B (4B active) | ~10.9 tok/s | gemma-4-31B dense ≈ 17.6 tok/s |

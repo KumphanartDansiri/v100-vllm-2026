@@ -1,6 +1,6 @@
 # Chapter 7 — Dead ends & lessons: the optimizations we *didn't* ship, and why
 
-> **Status: DRAFT** — verdicts final; any figures are claims/ranges, each cited to a result path.
+> **Status: Final** — verdicts final; any figures are claims/ranges, each cited to a result path.
 
 Most write-ups show you the wins. Here are the things that looked obviously worth doing and **didn't
 survive measurement.** This chapter exists because it's the honest backbone of the rest: the one real

@@ -1,6 +1,6 @@
 # Chapter 5 — The FP8 plugin: residency, and now decode speed
 
-> **Status: DRAFT** — numbers provisional until the final freeze ([FINAL_RERUN.md](FINAL_RERUN.md)). Single-user matrix rows auto-render from `data/benchmark_matrix.csv`; the A/B sweep tables below cite their own result dirs.
+> **Status: Final** — numbers frozen at the SSOT; single-user matrix rows auto-render from `data/benchmark_matrix.csv`, and the A/B sweep tables below cite their own result dirs. Refresh procedure: [FINAL_RERUN.md](FINAL_RERUN.md).
 
 V100 has no native FP8. The plugin is **W8A16**: FP8 weights stay **resident in HBM** (half the
 bytes) and are dequantized to FP16 *inside the kernel* for the matmul. The first telling of this

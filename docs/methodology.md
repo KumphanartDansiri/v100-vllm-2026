@@ -34,8 +34,13 @@ two numbers — most "V100 is slow" claims online compare incomparable things.
   Reported as the **median** of repeated runs; warmup/outlier samples are dropped.
 - **aggregate tok/s:** total output tokens/sec summed across *N concurrent* streams. Throughput,
   not latency. `aggregate ≈ per-user × N` only until the GPU saturates.
-- **TTFT (s):** time to first token (prefill latency). Steady-state **minimum** is reported (the
-  first request of a fresh server includes one-time warmup/cudagraph-capture cost — not TTFT).
+- **TTFT (s):** time to first token (prefill latency), single-stream, with chunked prefill **on** (the
+  V100-standard serve — disabling it is a known crash-causer). Two numbers are reported: **cold** = a
+  fresh, cache-cold request prefilling the full ~22.6k-token prompt (a guaranteed cache miss → the
+  worst case); **prefix-cache-hit** = the same prompt when its prefix is already cached (repeated /
+  shared context → the best case). Cold TTFT is prefill-bound; some FP8 checkpoints (notably the Qwen
+  block-FP8 models) carry a large prefill penalty on V100 even where FP8 wins decode — an unoptimized
+  FP8-prefill path, separate from the decode kernels (Chapter 5).
 - **users:** number of concurrent request streams (1 = single-user latency; 8 = concurrency).
 
 ## Execution modes — DO NOT cross-compare
@@ -77,7 +82,7 @@ one-shot faithfulness/coherence probes across four categories. The verbatim prom
 specs live in the companion repo's `tools/ch1_reliability_bench.sh` (`PROMPT_SPECS` + `prompt_text()`);
 the per-model revisit benches reuse the same five.
 
-| # | Category | reps | max_tokens | Question |
+| # | Category | Reps | max_tokens | Question |
 |---|---|---:|---:|---|
 | **Q1** | **Exactness / self-stability** | **5** | 4096 | *"Write a detailed, multi-section essay on the history, geography, economy, and culture of France. Use clear subsections with headings and develop each at length."* |
 | Q2 | Factual | 1 | 1024 | *"Explain, step by step, how a transformer neural network processes a sentence — from tokenization and embeddings through self-attention and feed-forward layers to the output distribution. Be precise and thorough."* |

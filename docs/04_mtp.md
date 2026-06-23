@@ -1,6 +1,6 @@
 # Chapter 4 — MTP (speculative decode): kept separate so it can't contaminate the baselines
 
-> **Status: DRAFT** — numbers provisional until the final freeze ([FINAL_RERUN.md](FINAL_RERUN.md)). Tables auto-render from `data/benchmark_matrix.csv`.
+> **Status: Final** — numbers frozen at the SSOT; tables auto-render from `data/benchmark_matrix.csv`. Refresh procedure: [FINAL_RERUN.md](FINAL_RERUN.md).
 
 Multi-Token Prediction runs a small draft head to propose *k* tokens per step, verified in one pass.
 It can speed up decode — but it changes what "tok/s" *means* (output per step now depends on an
@@ -29,7 +29,7 @@ depends on the model and precision.** Two reads off the sweep:
 ## The k-sweep (cudagraph, single-stream)
 
 <!-- render:mtp -->
-| Model | k | off tok/s | MTP tok/s | speedup | accept | exactness |
+| Model | k | Base tok/s | MTP tok/s | Speedup | Accept | Exactness |
 |---|---:|---:|---:|---:|---:|---|
 | Qwen3.6-27B (FP8, dense) | 1 | 36.28 | 26.48 | 0.73x | 88.4% | Exact |
 |  | 2 | 36.25 | 35.51 | 0.98x | 77.1% | Exact |

@@ -49,7 +49,7 @@ def overview():
         if r["users"] == "1" and r["config"] == "+moe_patch(tuned-json)":
             lines.append(row(r))
     lines.sort(key=lambda x: (x[0], 0 if "stock" in x[6] else 1))  # group by model; stock (non-patch) before +moe_patch
-    return md(["model", "prec", "total/active", "TP", "decode tok/s", "TTFT s", "config"], lines)
+    return md(["Model", "Format", "Total/Active", "TP", "Decode tok/s", "TTFT (s)", "Config"], lines)
 
 
 def moe_fix():
@@ -104,12 +104,13 @@ def model(sub):
     # show the engine column when a model was measured on >1 vLLM/stack
     eng = lambda r: f"{r['vllm_version']}/{r['torch_cuda']}"
     multi = len({eng(r) for r in sel}) > 1
-    head = (["vLLM"] if multi else []) + ["variant", "TP", "users", "config",
-            "per-user", "agg", "TTFT", "result_path"]
+    head = (["vLLM"] if multi else []) + ["Variant", "TP", "Users", "Config",
+            "Per-user", "Aggregate", "Cold TTFT", "FA Cold", "Prefix Hit", "Result path"]
     return md(head,
               [([eng(r)] if multi else []) +
                [r["variant"], f"TP{r['tp']}", r["users"], r["config"], r["tok_s_per_user"],
-                r["tok_s_aggregate"] or "-", r["ttft_s"] or "-", r["result_path"]] for r in sel])
+                r["tok_s_aggregate"] or "-", r["ttft_s"] or "-", r.get("ttft_fa_cold_s") or "-",
+                r.get("ttft_prefix_hit_s") or "-", r["result_path"]] for r in sel])
 
 
 def mtp():
@@ -133,7 +134,7 @@ def mtp():
         for _, line in sorted(groups[label], key=lambda kl: kl[0]):
             lines.append(line)
     _blank_repeat(lines, 0)
-    return md(["Model", "k", "off tok/s", "MTP tok/s", "speedup", "accept", "exactness"],
+    return md(["Model", "k", "Base tok/s", "MTP tok/s", "Speedup", "Accept", "Exactness"],
               lines, align=["l", "r", "r", "r", "r", "r", "l"])
 
 
@@ -145,7 +146,7 @@ def eager_cudagraph():
     # show only measured pairs (unmeasured families are omitted, not listed as "pending")
     lines = [[r["model"], r["eager_tok_s"], r["cudagraph_tok_s"], r["improvement"]]
              for r in rr if r["improvement"] != "pending" and r["eager_tok_s"] != "pending"]
-    return md(["model", "eager tok/s", "cudagraph tok/s", "improvement"], lines)
+    return md(["Model", "Eager tok/s", "Cudagraph tok/s", "Improvement"], lines)
 
 
 # ---- Chapter 1 dual-engine tables (perf_v2 rows = implementation_ref set) -------------------
@@ -191,7 +192,7 @@ def models_tested():                   # Table 1: identity primer (short | type 
             ln[1] = ln[0] = ""
         else:
             prev = ln[0]
-    return md(["Short name", "Model type", "Format", "Official checkpoint"], lines)
+    return md(["Short Name", "Model Type", "Format", "Official Checkpoint"], lines)
 
 
 def baseline():                        # Table 2: single-user, same-TP, dual-engine C1
@@ -219,7 +220,7 @@ def baseline():                        # Table 2: single-user, same-TP, dual-eng
     return md(["Model", "Format", "vLLM 0.19 C1", "vLLM 0.21 C1", "Notes"], lines)
 
 
-def engine_matrix(ver):                # Tables 3/4: full per-engine decode + cold TTFT
+def engine_matrix(ver):                # Tables 3/4: per-engine decode, per-user + aggregate Type rows
     cells, order = {}, []
     for r in rows:
         if not _pv2(r) or r["vllm_version"] != ver:
@@ -227,25 +228,48 @@ def engine_matrix(ver):                # Tables 3/4: full per-engine decode + co
         key = (r["model"], r["variant"], r["tp"], r["max_model_len"], r["notes"])
         c = cells.get(key)
         if c is None:
-            c = cells[key] = {"u": {}, "agg8": "", "ttft": ""}
+            c = cells[key] = {"pu": {}, "ag": {}}
             order.append(key)
-        c["u"][r["users"]] = r["tok_s_per_user"]
-        if r["users"] == "8":
-            c["agg8"] = r["tok_s_aggregate"]
-        if r["users"] == "1":
-            c["ttft"] = r["ttft_s"]
+        c["pu"][r["users"]] = r["tok_s_per_user"]
+        c["ag"][r["users"]] = r["tok_s_aggregate"]
+    order.sort(key=lambda k: (short(k[0]), k[1], k[2]))   # model, format, tp
     lines = []
     for (mdl, var, tp, mlen, notes) in order:
         c = cells[(mdl, var, tp, mlen, notes)]
-        u = c["u"]
         tag = "same-TP" if "same-TP" in notes else ("½-GPU (short ctx)" if "TP2 half-GPU" in notes else "")
-        lines.append([short(mdl), fmt(var), f"TP{tp}", mlen,
-                      u.get("1", "—"), u.get("2", "—"), u.get("4", "—"), u.get("8", "—"),
-                      c["agg8"] or "—", c["ttft"] or "—", tag])
-    lines.sort(key=lambda x: (x[0], x[1], x[2]))
+        head2 = [short(mdl), fmt(var), f"TP{tp}", mlen]
+        pu = head2 + ["Per-user"] + [c["pu"].get(u, "—") for u in ("1", "2", "4", "8")] + [tag]
+        ag = ["", "", "", ""] + ["Aggregate"] + [c["ag"].get(u, "—") for u in ("1", "2", "4", "8")] + [""]
+        lines += [pu, ag]
+    _blank_repeat(lines, 0)                                # blank repeated model (now only on per-user rows)
+    return md(["Model", "Format", "TP", "Max Context", "Type", "C1", "C2", "C4", "C8", "Notes"],
+              lines, align=["l", "l", "l", "r", "l", "r", "r", "r", "r", "l"])
+
+
+def ttft_matrix():                     # Ch1: dual-engine first-token latency (single-stream, same-TP C1)
+    pick = {}                          # (model,variant) -> {ver: row}; same selection as baseline()
+    for r in rows:
+        if not _pv2(r) or r["users"] != "1" or "TP2 half-GPU" in r["notes"]:
+            continue
+        d = pick.setdefault((r["model"], r["variant"]), {})
+        cur = d.get(r["vllm_version"])
+        if cur is None or ("same-TP" in r["notes"] and "same-TP" not in cur["notes"]):
+            d[r["vllm_version"]] = r
+    s_ = lambda v: f"{v} s" if v else "—"
+    lines = []
+    for (mdl, var), d in sorted(pick.items(), key=lambda kv: (short(kv[0][0]), kv[0][1])):
+        r21, r19 = d.get("0.21.0"), d.get("0.19.0")
+        rep = r21 or r19 or {}
+        tp = rep.get("tp", "")
+        cold19 = s_(r19["ttft_s"]) if r19 and r19.get("ttft_s") else "—"
+        cold21 = s_(r21["ttft_s"]) if r21 and r21.get("ttft_s") else "—"
+        warm = s_(rep.get("ttft_prefix_hit_s")) if rep.get("ttft_prefix_hit_s") else "—"
+        fa = s_(rep.get("ttft_fa_cold_s")) if rep.get("ttft_fa_cold_s") else "—"
+        lines.append([short(mdl), fmt(var), f"TP{tp}", cold19, cold21, fa, warm])
     _blank_repeat(lines, 0)
-    return md(["Model", "Format", "TP", "Max len", "C1", "C2", "C4", "C8/u", "C8 agg",
-               "Cold TTFT", "Notes"], lines)
+    return (md(["Model", "Format", "TP", "Cold 0.19", "Cold 0.21", "FA-on Cold<br>(0.21)",
+                "Prefix-cache Hit<br>(0.21)"], lines,
+               align=["l", "l", "l", "r", "r", "r", "r"]) + TTFT_NOTE)
 
 
 # ---- Chapter-6 digest views: curated, FROZEN (perf_v2-only) render views per model family ------
@@ -312,29 +336,51 @@ def _cfg(c):                           # (label, variant, tp, [flag]) -> (label,
 
 
 TTFT_NOTE = (
-    "\n\n¹ **Warm TTFT** = warm / prefix-cache-hit / chunked-prefill serving latency — **pending SSOT "
-    "refresh**. **Cold TTFT** is cold *monolithic* prefill from the representative SSOT row: a "
-    "**worst-case** number, *not* warm serving latency — don't read it as steady interactive response.")
+    "\n\nAll TTFT is single-stream, chunked-prefill **on** (the project-standard serve — disabling chunked "
+    "prefill is a known V100 crash-causer). **Cold first-token** = a fresh, cache-cold request prefilling "
+    "the full ~22.6k-token prompt (worst case); **Prefix-cache-hit** = the same prompt with its prefix "
+    "already cached — repeated or shared context (best case). Cold TTFT is prefill-bound, and the Qwen "
+    "**block-FP8** checkpoints carry a large prefill penalty on V100 (an unoptimized FP8-prefill path, "
+    "worst on the MoE models) — a latency-side current-state limit, not where FP8's *decode* win lives; "
+    "compressed-tensors FP8 (Gemma/GLM) and FP16/Int4 prefill cheaper.")
 
 
-def single_user(key):                  # C1 deployment summary: config rows x {per-engine decode, TTFT}
+def single_user(key):                  # C1 deployment summary: per-engine decode only (TTFT -> its own table)
     s = DIGEST_SPECS[key]
     cfgs = [_cfg(c) for c in s["configs"]]
     engs = s["engines"]
-    tt = "0.21.0" if "0.21.0" in engs else engs[-1]   # representative engine for the (cold) TTFT cell
-    head = (["Choice"] + [f"{_eng(e)} C1 decode" for e in engs]
-            + [f"{_eng(tt)} Cold TTFT", f"{_eng(tt)} Warm TTFT¹"])
+    head = ["Choice"] + [f"{_eng(e)} C1 Decode" for e in engs]
     lines = []
     for lbl, var, tp, _ in cfgs:
         row = [lbl]
         for e in engs:
             r = _digest_row(s["match"], e, var, tp, "1")
             row.append(f"{r['tok_s_per_user']} tok/s" if r else "—")
-        rt = _digest_row(s["match"], tt, var, tp, "1")
-        row.append(f"{rt['ttft_s']} s" if (rt and rt["ttft_s"]) else "—")
-        row.append("pending")
         lines.append(row)
-    return md(head, lines, align=["l"] + ["r"] * (len(engs) + 2)) + TTFT_NOTE
+    return md(head, lines, align=["l"] + ["r"] * len(engs))
+
+
+def ttft(key):                         # per-engine first-token latency: cold / (FA-on cold) / prefix-cache-hit
+    s = DIGEST_SPECS[key]
+    cfgs = [_cfg(c) for c in s["configs"]]
+    s_ = lambda v: f"{v} s" if v else "—"
+    picked = []                        # (config_label, engine, row) for every config × engine that has TTFT
+    for lbl, var, tp, _ in cfgs:
+        for e in s["engines"]:
+            r = _digest_row(s["match"], e, var, tp, "1")
+            if r and (r.get("ttft_s") or r.get("ttft_prefix_hit_s") or r.get("ttft_fa_cold_s")):
+                picked.append((lbl, e, r))
+    has_fa = any(r.get("ttft_fa_cold_s") for _, _, r in picked)
+    head = ["Choice", "Engine", "Cold First Token"] + (["FA-on Cold"] if has_fa else []) + ["Prefix-cache Hit"]
+    lines = []
+    for lbl, e, r in picked:
+        row = [lbl, _eng(e), s_(r.get("ttft_s"))]
+        if has_fa:
+            row.append(s_(r.get("ttft_fa_cold_s")))
+        row.append(s_(r.get("ttft_prefix_hit_s")))
+        lines.append(row)
+    _blank_repeat(lines, 0)            # blank repeated Choice — engine rows fold under their config
+    return md(head, lines, align=["l", "l"] + ["r"] * (len(head) - 2)) + TTFT_NOTE
 
 
 def concurrency(key):                  # same-TP scaling: per-config per-user/aggregate x C1/C2/C4/C8
@@ -344,8 +390,8 @@ def concurrency(key):                  # same-TP scaling: per-config per-user/ag
         for lbl, var, tp, su_only in (_cfg(c) for c in s["configs"]):
             if su_only:                # half-GPU / fit options belong in the single-user table, not here
                 continue
-            pu = [f"{_eng(eng)} {lbl}", "per-user"]
-            ag = ["", "aggregate"]
+            pu = [f"{_eng(eng)} {lbl}", "Per-user"]
+            ag = ["", "Aggregate"]
             seen = False
             for u in ("1", "2", "4", "8"):
                 r = _digest_row(s["match"], eng, var, tp, u)
@@ -380,8 +426,12 @@ def resolve(cmd):
         return model(cmd.split(":", 1)[1])
     if cmd.startswith("single_user:"):
         return single_user(cmd.split(":", 1)[1])
+    if cmd.startswith("ttft:"):
+        return ttft(cmd.split(":", 1)[1])
     if cmd.startswith("concurrency:"):
         return concurrency(cmd.split(":", 1)[1])
+    if cmd == "ttft_matrix":
+        return ttft_matrix()
     return f"_(unknown render command: {cmd})_"
 
 

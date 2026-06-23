@@ -9,7 +9,9 @@ is worth serving, and what caveats apply.
 - **Headline numbers are base cudagraph decode, not MTP** (MTP is Chapter 4).
 - **TP is fit-bounded** — an absent TP row means *not measured / not feasible*, not zero.
 - **FP8 rows use the companion V100 plugin** unless noted; FP16/BF16 is stock vLLM.
-- **Cold TTFT** is cold monolithic prefill; warm / chunked-prefill TTFT is a future SSOT add.
+- **TTFT** has its own per-page table: **cold** (cache-cold full prefill, worst case) vs
+  **prefix-cache-hit** (repeated/shared prefix, best case). FP8 pays a prefill dequant tax even where
+  it wins decode.
 - **Quality / exactness** follows the methodology 5-test suite (Exact / Stable — see `methodology.md`).
 
 ## Engine / image / patch compatibility

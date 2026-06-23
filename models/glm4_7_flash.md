@@ -1,6 +1,6 @@
 # GLM-4.7-Flash (MLA MoE — BF16) — V100 model-family page
 
-> **Status: DRAFT** — provisional until the final freeze ([../docs/FINAL_RERUN.md](../docs/FINAL_RERUN.md)). Digest tables render from `data/benchmark_matrix.csv` (perf_v2-frozen rows only); the exhaustive raw SSOT table is at the bottom.
+> **Status: Final** — numbers frozen from `data/benchmark_matrix.csv` (perf_v2 rows, tag `fp8-v100-2026-matrix`); digest tables auto-render and the exhaustive raw SSOT table is at the bottom. Refresh procedure: [../docs/FINAL_RERUN.md](../docs/FINAL_RERUN.md).
 
 A **~31B-total / ~3B-active lite-MoE** (`Glm4MoeLiteForCausalLM`) with **MLA** attention, BF16 /
 unquantized. **The first MLA-attention model to generate on the V100 (`sm_70`) stack** — not an
@@ -29,19 +29,17 @@ FlashAttention MLA *prefill* backend. Three env-gated patches unblock it (decode
   decode here is **stock TritonMLA** (not our kernels), so it is *not* engine-invariant.
 
 ## Single-user deployment summary
-*What one stream expects at C1 — decode throughput on each engine, plus representative 0.21 cold first-token latency.*
+*What one stream expects at C1 — decode throughput on each engine.*
 
 <!-- render:single_user:glm4_7_flash -->
-| Choice | 0.19 C1 decode | 0.21 C1 decode | 0.21 Cold TTFT | 0.21 Warm TTFT¹ |
-|---|---:|---:|---:|---:|
-| BF16 TP4 | 35.36 tok/s | 30.97 tok/s | 143.12 s | pending |
-
-¹ **Warm TTFT** = warm / prefix-cache-hit / chunked-prefill serving latency — **pending SSOT refresh**. **Cold TTFT** is cold *monolithic* prefill from the representative SSOT row: a **worst-case** number, *not* warm serving latency — don't read it as steady interactive response.
+| Choice | 0.19 C1 Decode | 0.21 C1 Decode |
+|---|---:|---:|
+| BF16 TP4 | 35.36 tok/s | 30.97 tok/s |
 <!-- endrender -->
 
 ~31 (0.21) / ~35 (0.19) tok/s — comfortably usable, on the first MLA model to run on V100 at all. Its
-**cold TTFT is high — see the TTFT / prefill section below**; note 0.21's 143 s is actually *better*
-than 0.19's 206 s (the one model where 0.21 wins prefill).
+**cold TTFT is high — see the TTFT / prefill section below**; note 0.21's ~144 s is actually *better*
+than 0.19's ~212 s (the one model where 0.21 wins prefill).
 
 ## Concurrency shape
 *How it scales C1→C8 at TP4. Each config has two rows: **per-user** = one stream; **aggregate** = total
@@ -50,20 +48,32 @@ box throughput.*
 <!-- render:concurrency:glm4_7_flash -->
 | Config | Type | C1 | C2 | C4 | C8 |
 |---|---|---:|---:|---:|---:|
-| 0.19 BF16 TP4 | per-user | 35.36 | 27.62 | 21.37 | 17.5 |
-|  | aggregate | 35.36 | 55.24 | 85.48 | 140.01 |
-| 0.21 BF16 TP4 | per-user | 30.97 | 21.17 | 13.25 | 10.35 |
-|  | aggregate | 30.97 | 42.34 | 53.0 | 82.78 |
+| 0.19 BF16 TP4 | Per-user | 35.36 | 27.62 | 21.37 | 17.5 |
+|  | Aggregate | 35.36 | 55.24 | 85.48 | 140.01 |
+| 0.21 BF16 TP4 | Per-user | 30.97 | 21.17 | 13.25 | 10.35 |
+|  | Aggregate | 30.97 | 42.34 | 53.0 | 82.78 |
 <!-- endrender -->
 
 Scales modestly (MLA decode + an untuned MoE shape); **0.19 scales notably better** (aggregate 140 vs
 83 @C8). All streams coherent.
 
 ## TTFT / prefill — the open item
-**Cold TTFT = 143 s (0.21) / 206 s (0.19)** — cold monolithic prefill at 32k. MLA prefill is inherently
-eager and GLM's MoE shape (`E=64, N=384`) has no tuned Volta config yet, so prefill is the slow part.
-The *decode* chapter is done; the prefill/TTFT chapter (autotune that MoE JSON) is future work. (A short
-warm prompt is ~2 s to first token — the cold number is the worst case.)
+**Cold first-token ≈ 144 s (0.21) / 212 s (0.19)** — a fresh, cache-cold full prefill at ~22.6k tokens.
+MLA prefill is inherently eager and GLM's MoE shape (`E=64, N=384`) has no tuned Volta config yet, so
+prefill is the slow part — and uniquely, **0.21 prefills faster than 0.19 here**. The *decode* chapter
+is done; the prefill/TTFT chapter (autotune that MoE JSON) is future work.
+
+<!-- render:ttft:glm4_7_flash -->
+| Choice | Engine | Cold First Token | Prefix-cache Hit |
+|---|---|---:|---:|
+| BF16 TP4 | 0.19 | 212.489 s | 0.452 s |
+|  | 0.21 | 143.993 s | 0.454 s |
+
+All TTFT is single-stream, chunked-prefill **on** (the project-standard serve — disabling chunked prefill is a known V100 crash-causer). **Cold first-token** = a fresh, cache-cold request prefilling the full ~22.6k-token prompt (worst case); **Prefix-cache-hit** = the same prompt with its prefix already cached — repeated or shared context (best case). Cold TTFT is prefill-bound, and the Qwen **block-FP8** checkpoints carry a large prefill penalty on V100 (an unoptimized FP8-prefill path, worst on the MoE models) — a latency-side current-state limit, not where FP8's *decode* win lives; compressed-tensors FP8 (Gemma/GLM) and FP16/Int4 prefill cheaper.
+<!-- endrender -->
+
+Prefix-cache-hit (repeated/shared prefix) is sub-second — the cold number is the worst case, paid once
+per fresh request.
 
 ## Caveats
 - **Reasoning model** (`<think>…</think>`): coherent + **7/8** verifiable Q&A correct at realistic
@@ -79,14 +89,14 @@ recommended reading; if a digest and these rows ever disagree, **the SSOT rows w
 renderer/prose is fixed.*
 
 <!-- render:model:GLM-4.7-Flash -->
-| vLLM | variant | TP | users | config | per-user | agg | TTFT | result_path |
-|---|---|---|---|---|---|---|---|---|
-| 0.21.0/cu126 | bf16 | TP4 | 1 | fp16mla+cudagraph | 30.97 | 30.97 | 143.12 | results/perf_v2_glm47_fp16_021_20260621_172718 |
-| 0.21.0/cu126 | bf16 | TP4 | 2 | fp16mla+cudagraph | 21.17 | 42.34 | - | results/perf_v2_glm47_fp16_021_20260621_172718 |
-| 0.21.0/cu126 | bf16 | TP4 | 4 | fp16mla+cudagraph | 13.25 | 53.0 | - | results/perf_v2_glm47_fp16_021_20260621_172718 |
-| 0.21.0/cu126 | bf16 | TP4 | 8 | fp16mla+cudagraph | 10.35 | 82.78 | - | results/perf_v2_glm47_fp16_021_20260621_172718 |
-| 0.19.0/cu128 | bf16 | TP4 | 1 | fp16mla+cudagraph | 35.36 | 35.36 | 205.91 | results/perf_v2_glm47_fp16_019_20260622_001738 |
-| 0.19.0/cu128 | bf16 | TP4 | 2 | fp16mla+cudagraph | 27.62 | 55.24 | - | results/perf_v2_glm47_fp16_019_20260622_001738 |
-| 0.19.0/cu128 | bf16 | TP4 | 4 | fp16mla+cudagraph | 21.37 | 85.48 | - | results/perf_v2_glm47_fp16_019_20260622_001738 |
-| 0.19.0/cu128 | bf16 | TP4 | 8 | fp16mla+cudagraph | 17.5 | 140.01 | - | results/perf_v2_glm47_fp16_019_20260622_001738 |
+| vLLM | Variant | TP | Users | Config | Per-user | Aggregate | Cold TTFT | FA Cold | Prefix Hit | Result path |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 0.21.0/cu126 | bf16 | TP4 | 1 | fp16mla+cudagraph | 30.97 | 30.97 | 143.993 | - | 0.454 | results/perf_v2_glm47_fp16_021_20260621_172718 |
+| 0.21.0/cu126 | bf16 | TP4 | 2 | fp16mla+cudagraph | 21.17 | 42.34 | - | - | - | results/perf_v2_glm47_fp16_021_20260621_172718 |
+| 0.21.0/cu126 | bf16 | TP4 | 4 | fp16mla+cudagraph | 13.25 | 53.0 | - | - | - | results/perf_v2_glm47_fp16_021_20260621_172718 |
+| 0.21.0/cu126 | bf16 | TP4 | 8 | fp16mla+cudagraph | 10.35 | 82.78 | - | - | - | results/perf_v2_glm47_fp16_021_20260621_172718 |
+| 0.19.0/cu128 | bf16 | TP4 | 1 | fp16mla+cudagraph | 35.36 | 35.36 | 212.489 | - | 0.452 | results/perf_v2_glm47_fp16_019_20260622_001738 |
+| 0.19.0/cu128 | bf16 | TP4 | 2 | fp16mla+cudagraph | 27.62 | 55.24 | - | - | - | results/perf_v2_glm47_fp16_019_20260622_001738 |
+| 0.19.0/cu128 | bf16 | TP4 | 4 | fp16mla+cudagraph | 21.37 | 85.48 | - | - | - | results/perf_v2_glm47_fp16_019_20260622_001738 |
+| 0.19.0/cu128 | bf16 | TP4 | 8 | fp16mla+cudagraph | 17.5 | 140.01 | - | - | - | results/perf_v2_glm47_fp16_019_20260622_001738 |
 <!-- endrender -->
