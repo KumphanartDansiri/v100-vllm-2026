@@ -311,19 +311,30 @@ def _cfg(c):                           # (label, variant, tp, [flag]) -> (label,
     return c[0], c[1], c[2], (len(c) > 3 and c[3] == "single_user")
 
 
-def single_user(key):                  # C1 deployment summary: engine rows x config columns (all configs)
+TTFT_NOTE = (
+    "\n\n¹ **Warm TTFT** = warm / prefix-cache-hit / chunked-prefill serving latency — **pending SSOT "
+    "refresh**. **Cold TTFT** is cold *monolithic* prefill from the representative SSOT row: a "
+    "**worst-case** number, *not* warm serving latency — don't read it as steady interactive response.")
+
+
+def single_user(key):                  # C1 deployment summary: config rows x {per-engine decode, TTFT}
     s = DIGEST_SPECS[key]
     cfgs = [_cfg(c) for c in s["configs"]]
+    engs = s["engines"]
+    tt = "0.21.0" if "0.21.0" in engs else engs[-1]   # representative engine for the (cold) TTFT cell
+    head = (["Choice"] + [f"{_eng(e)} C1 decode" for e in engs]
+            + [f"{_eng(tt)} Cold TTFT", f"{_eng(tt)} Warm TTFT¹"])
     lines = []
-    for eng in s["engines"]:
-        row = [_eng(eng)]
-        for lbl, var, tp, _ in cfgs:
-            r = _digest_row(s["match"], eng, var, tp, "1")
-            row.append(r["tok_s_per_user"] if r else "—")
+    for lbl, var, tp, _ in cfgs:
+        row = [lbl]
+        for e in engs:
+            r = _digest_row(s["match"], e, var, tp, "1")
+            row.append(f"{r['tok_s_per_user']} tok/s" if r else "—")
+        rt = _digest_row(s["match"], tt, var, tp, "1")
+        row.append(f"{rt['ttft_s']} s" if (rt and rt["ttft_s"]) else "—")
+        row.append("pending")
         lines.append(row)
-    # two-line column headers: "FP16 TP4" -> "FP16<br>TP4" (precision over TP) for a narrower table
-    head = ["vLLM"] + [c[0].replace(" TP", "<br>TP") for c in cfgs]
-    return md(head, lines, align=["l"] + ["r"] * len(cfgs))
+    return md(head, lines, align=["l"] + ["r"] * (len(engs) + 2)) + TTFT_NOTE
 
 
 def concurrency(key):                  # same-TP scaling: per-config per-user/aggregate x C1/C2/C4/C8

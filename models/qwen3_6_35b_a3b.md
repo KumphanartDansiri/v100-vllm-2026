@@ -21,13 +21,16 @@ pays off and never hits the dense CUDA-core wall (each token touches only a few 
 - **Best engine:** 0.19 for decode throughput (faster at every point); 0.21 also works.
 
 ## Single-user deployment summary
-*What one stream gets at C1, per engine — the precision/TP choice for a solo user or small lab.*
+*What one stream expects at C1 — decode throughput on each engine, plus representative 0.21 cold first-token latency; this is the precision/TP choice for a solo user or small lab.*
 
 <!-- render:single_user:qwen3_6_35b_a3b -->
-| vLLM | FP16<br>TP4 | FP8<br>TP4 | FP8<br>TP2 |
-|---|---:|---:|---:|
-| 0.19 | 63.3 | 89.92 | — |
-| 0.21 | 55.93 | 74.92 | 71.0 |
+| Choice | 0.19 C1 decode | 0.21 C1 decode | 0.21 Cold TTFT | 0.21 Warm TTFT¹ |
+|---|---:|---:|---:|---:|
+| FP16 TP4 | 63.3 tok/s | 55.93 tok/s | 12.65 s | pending |
+| FP8 TP4 | 89.92 tok/s | 74.92 tok/s | 14.28 s | pending |
+| FP8 TP2 | — | 71.0 tok/s | — | pending |
+
+¹ **Warm TTFT** = warm / prefix-cache-hit / chunked-prefill serving latency — **pending SSOT refresh**. **Cold TTFT** is cold *monolithic* prefill from the representative SSOT row: a **worst-case** number, *not* warm serving latency — don't read it as steady interactive response.
 <!-- endrender -->
 
 **FP8 ≫ FP16 at C1** (90 vs 63 on 0.19); the **half-GPU FP8 TP2** option (0.21) still serves 71 tok/s,

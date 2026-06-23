@@ -23,17 +23,22 @@ footprint; FP16 reclaims the 8-user aggregate (the dense CUDA-core-vs-tensor-cor
   portability result).
 
 ## Single-user deployment summary
-*What one stream gets at C1, per engine — the precision/TP choice for a solo user or small lab.*
+*What one stream expects at C1 — decode throughput on each engine, plus representative 0.21 cold first-token latency; this is the precision/TP choice for a solo user or small lab.*
 
 <!-- render:single_user:gemma4_31b -->
-| vLLM | FP16<br>TP4 | FP8<br>TP4 | FP8<br>TP2 |
-|---|---:|---:|---:|
-| 0.19 | 26.73 | 35.23 | — |
-| 0.21 | 26.73 | 35.28 | 23.07 |
+| Choice | 0.19 C1 decode | 0.21 C1 decode | 0.21 Cold TTFT | 0.21 Warm TTFT¹ |
+|---|---:|---:|---:|---:|
+| FP16 TP4 | 26.73 tok/s | 26.73 tok/s | 185.82 s | pending |
+| FP8 TP4 | 35.23 tok/s | 35.28 tok/s | 196.03 s | pending |
+| FP8 TP2 | — | 23.07 tok/s | — | pending |
+
+¹ **Warm TTFT** = warm / prefix-cache-hit / chunked-prefill serving latency — **pending SSOT refresh**. **Cold TTFT** is cold *monolithic* prefill from the representative SSOT row: a **worst-case** number, *not* warm serving latency — don't read it as steady interactive response.
 <!-- endrender -->
 
 **FP8 beats FP16 at C1** (35.3 vs 26.7) — the value here is *both* memory and low-user speed. The
-half-GPU **FP8 TP2** (~23 tok/s) lets you serve gemma-4-31B on 2 cards.
+half-GPU **FP8 TP2** (~23 tok/s) lets you serve gemma-4-31B on 2 cards. **Cold first-token latency is
+high** (~190 s) — dense Gemma-4 prefill is untuned on Volta and is the slow part; **decode is the story
+here**; warm/chunked TTFT is pending and should not be inferred from this cold number.
 
 ## Concurrency shape
 *At a comparable serving config (same TP), how precision/engine scales C1→C8. Each config has two rows:

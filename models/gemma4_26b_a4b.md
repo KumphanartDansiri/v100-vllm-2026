@@ -22,13 +22,16 @@ on 0.19). Where it runs, FP8 beats FP16 at every concurrency.
   case where 0.21 FP16 > 0.19 FP16).
 
 ## Single-user deployment summary
-*What one stream gets at C1, per engine. FP8 is 0.21-only (— on 0.19).*
+*What one stream expects at C1 — decode throughput on each engine, plus representative 0.21 cold first-token latency. FP8 is 0.21-only (— on 0.19).*
 
 <!-- render:single_user:gemma4_26b_a4b -->
-| vLLM | FP16<br>TP4 | FP8<br>TP4 | FP8<br>TP2 |
-|---|---:|---:|---:|
-| 0.19 | 39.47 | — | — |
-| 0.21 | 44.39 | 72.85 | 60.15 |
+| Choice | 0.19 C1 decode | 0.21 C1 decode | 0.21 Cold TTFT | 0.21 Warm TTFT¹ |
+|---|---:|---:|---:|---:|
+| FP16 TP4 | 39.47 tok/s | 44.39 tok/s | 53.60 s | pending |
+| FP8 TP4 | — | 72.85 tok/s | 50.64 s | pending |
+| FP8 TP2 | — | 60.15 tok/s | — | pending |
+
+¹ **Warm TTFT** = warm / prefix-cache-hit / chunked-prefill serving latency — **pending SSOT refresh**. **Cold TTFT** is cold *monolithic* prefill from the representative SSOT row: a **worst-case** number, *not* warm serving latency — don't read it as steady interactive response.
 <!-- endrender -->
 
 On 0.21, **FP8 ≫ FP16** (72.9 vs 44.4); the half-GPU **FP8 TP2** (60 tok/s) fits on 2 cards.

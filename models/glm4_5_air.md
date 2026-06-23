@@ -21,13 +21,14 @@ of the FP8 plugin.
   @C1), against the fleet pattern of 0.19 winning decode.
 
 ## Single-user deployment summary
-*What one stream gets at C1, per engine.*
+*What one stream expects at C1 — decode throughput on each engine, plus representative 0.21 cold first-token latency.*
 
 <!-- render:single_user:glm4_5_air -->
-| vLLM | FP8<br>TP8 |
-|---|---:|
-| 0.19 | 64.67 |
-| 0.21 | 65.45 |
+| Choice | 0.19 C1 decode | 0.21 C1 decode | 0.21 Cold TTFT | 0.21 Warm TTFT¹ |
+|---|---:|---:|---:|---:|
+| FP8 TP8 | 64.67 tok/s | 65.45 tok/s | 42.06 s | pending |
+
+¹ **Warm TTFT** = warm / prefix-cache-hit / chunked-prefill serving latency — **pending SSOT refresh**. **Cold TTFT** is cold *monolithic* prefill from the representative SSOT row: a **worst-case** number, *not* warm serving latency — don't read it as steady interactive response.
 <!-- endrender -->
 
 **~65 tok/s single-stream** on a 106B model, on 7-year-old GPUs.

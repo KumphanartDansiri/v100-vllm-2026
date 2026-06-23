@@ -20,13 +20,16 @@ TP. FP16 reclaims the 8-user aggregate (the dense CUDA-core-vs-tensor-core wall,
 - **Best engine:** 0.19 for decode throughput (faster at every same-TP point); 0.21 also works.
 
 ## Single-user deployment summary
-*What one stream gets at C1, per engine — the precision/TP choice for a solo user or small lab.*
+*What one stream expects at C1 — decode throughput on each engine, plus representative 0.21 cold first-token latency; this is the precision/TP choice for a solo user or small lab.*
 
 <!-- render:single_user:qwen3_6_27b -->
-| vLLM | FP16<br>TP4 | FP8<br>TP4 | FP8<br>TP2 |
-|---|---:|---:|---:|
-| 0.19 | 40.05 | 54.35 | 35.13 |
-| 0.21 | 35.37 | 46.13 | 31.69 |
+| Choice | 0.19 C1 decode | 0.21 C1 decode | 0.21 Cold TTFT | 0.21 Warm TTFT¹ |
+|---|---:|---:|---:|---:|
+| FP16 TP4 | 40.05 tok/s | 35.37 tok/s | 25.97 s | pending |
+| FP8 TP4 | 54.35 tok/s | 46.13 tok/s | 32.22 s | pending |
+| FP8 TP2 | 35.13 tok/s | 31.69 tok/s | 62.35 s | pending |
+
+¹ **Warm TTFT** = warm / prefix-cache-hit / chunked-prefill serving latency — **pending SSOT refresh**. **Cold TTFT** is cold *monolithic* prefill from the representative SSOT row: a **worst-case** number, *not* warm serving latency — don't read it as steady interactive response.
 <!-- endrender -->
 
 Same-card (TP4) **FP8 beats FP16** (54 vs 40 on 0.19); the **half-GPU FP8 TP2** option still serves

@@ -29,16 +29,19 @@ FlashAttention MLA *prefill* backend. Three env-gated patches unblock it (decode
   decode here is **stock TritonMLA** (not our kernels), so it is *not* engine-invariant.
 
 ## Single-user deployment summary
-*What one stream gets at C1, per engine.*
+*What one stream expects at C1 — decode throughput on each engine, plus representative 0.21 cold first-token latency.*
 
 <!-- render:single_user:glm4_7_flash -->
-| vLLM | BF16<br>TP4 |
-|---|---:|
-| 0.19 | 35.36 |
-| 0.21 | 30.97 |
+| Choice | 0.19 C1 decode | 0.21 C1 decode | 0.21 Cold TTFT | 0.21 Warm TTFT¹ |
+|---|---:|---:|---:|---:|
+| BF16 TP4 | 35.36 tok/s | 30.97 tok/s | 143.12 s | pending |
+
+¹ **Warm TTFT** = warm / prefix-cache-hit / chunked-prefill serving latency — **pending SSOT refresh**. **Cold TTFT** is cold *monolithic* prefill from the representative SSOT row: a **worst-case** number, *not* warm serving latency — don't read it as steady interactive response.
 <!-- endrender -->
 
-~31 (0.21) / ~35 (0.19) tok/s — comfortably usable, on the first MLA model to run on V100 at all.
+~31 (0.21) / ~35 (0.19) tok/s — comfortably usable, on the first MLA model to run on V100 at all. Its
+**cold TTFT is high — see the TTFT / prefill section below**; note 0.21's 143 s is actually *better*
+than 0.19's 206 s (the one model where 0.21 wins prefill).
 
 ## Concurrency shape
 *How it scales C1→C8 at TP4. Each config has two rows: **per-user** = one stream; **aggregate** = total
