@@ -265,6 +265,33 @@ DIGEST_SPECS = {
         "configs": [("FP16 TP4", "fp16", "4"), ("FP8 TP4", "fp8", "4"),
                     ("FP8 TP2", "fp8", "2", "single_user")],   # half-GPU = a fit option, not scaling
     },
+    "qwen3_5_122b_a10b": {
+        "match": "Qwen3.5-122B-A10B",
+        "engines": ["0.19.0", "0.21.0"],
+        "configs": [("FP8 TP8", "fp8", "8"), ("GPTQ-Int4 TP8", "GPTQ-Int4", "8")],
+    },
+    "gemma4_31b": {
+        "match": "gemma-4-31B",
+        "engines": ["0.19.0", "0.21.0"],
+        "configs": [("FP16 TP4", "fp16", "4"), ("FP8 TP4", "fp8", "4"),
+                    ("FP8 TP2", "fp8", "2", "single_user")],
+    },
+    "gemma4_26b_a4b": {
+        "match": "gemma-4-26B-A4B",
+        "engines": ["0.19.0", "0.21.0"],
+        "configs": [("FP16 TP4", "fp16", "4"), ("FP8 TP4", "fp8", "4"),
+                    ("FP8 TP2", "fp8", "2", "single_user")],
+    },
+    "glm4_5_air": {
+        "match": "GLM-4.5-Air",
+        "engines": ["0.19.0", "0.21.0"],
+        "configs": [("FP8 TP8", "fp8", "8")],
+    },
+    "glm4_7_flash": {
+        "match": "GLM-4.7-Flash",
+        "engines": ["0.19.0", "0.21.0"],
+        "configs": [("BF16 TP4", "bf16", "4")],
+    },
 }
 
 
@@ -294,7 +321,9 @@ def single_user(key):                  # C1 deployment summary: engine rows x co
             r = _digest_row(s["match"], eng, var, tp, "1")
             row.append(r["tok_s_per_user"] if r else "—")
         lines.append(row)
-    return md(["vLLM"] + [c[0] for c in cfgs], lines, align=["l"] + ["r"] * len(cfgs))
+    # two-line column headers: "FP16 TP4" -> "FP16<br>TP4" (precision over TP) for a narrower table
+    head = ["vLLM"] + [c[0].replace(" TP", "<br>TP") for c in cfgs]
+    return md(head, lines, align=["l"] + ["r"] * len(cfgs))
 
 
 def concurrency(key):                  # same-TP scaling: per-config per-user/aggregate x C1/C2/C4/C8

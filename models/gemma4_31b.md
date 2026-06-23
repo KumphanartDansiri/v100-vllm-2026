@@ -1,46 +1,70 @@
-# gemma-4-31B-it
+# gemma-4-31B-it (dense — FP16 + FP8) — V100 model-family page
 
-Dense 31B (`Gemma4ForConditionalGeneration`, 60 layers, no MoE — active = total). Measured on both
-vLLM 0.21 (`vllm021-cu126`, transformers 5.10) and vLLM 0.19 (`vllm019-tf5`, transformers 5.5),
-TP4, cudagraph, `--skip-mm-profiling`. Decode = steady-state 256-tok streaming (TTFT-immune).
+> **Status: DRAFT** — provisional until the final freeze ([../docs/FINAL_RERUN.md](../docs/FINAL_RERUN.md)). Digest tables render from `data/benchmark_matrix.csv` (perf_v2-frozen rows only); the exhaustive raw SSOT table is at the bottom.
 
-- **What fits / feasible TP:** TP4 on 4×V100-32GB. FP16 weights ~62 GB → ~15.5 GB/GPU; FP8 ~31 GB
-  → ~7.8 GB/GPU. FP8 halves the weight bytes per card → **~1.55× more KV headroom**.
-- **Best TP / flags:** `--tensor-parallel-size 4 --dtype float16 --skip-mm-profiling
-  --max-num-batched-tokens 8192 --compilation-config '{"mode":0,"cudagraph_mode":"FULL_DECODE_ONLY"}'`.
-  FP8 adds the plugin (`VLLM_V100_CT_FP8_RESIDENT=1` + `VLLM_V100_FP8_COALESCED_GEMV=1`).
-- **Transformers requirement:** Gemma-4 needs **transformers ≥ 5.x on *both* engines** (stock 0.19 +
-  tf 4.57 can't parse `model_type=gemma4` — vLLM 0.19's own `gemma4.py` imports
-  `transformers.models.gemma4`, added in tf 5.x). Use the `vllm019-tf5` image for 0.19.
-- **`--max-num-batched-tokens 8192` is required on vLLM 0.21:** Gemma-4's vision tower has
-  multimodal-bidirectional attention, so 0.21 force-disables chunked-MM-input and then requires
-  `max_num_batched_tokens ≥ max_tokens_per_mm_item (2496)`; the 2048 default fails at startup. 0.19
-  doesn't enforce this. (Text-only decode is insensitive to the value, so it doesn't bias the comparison.)
-- **FP16 baseline vs FP8 — FP8 now *wins* single-stream:** **35.3 vs 26.7 tok/s at C1 (FP8 +32%)**, at
-  half the weight footprint + more KV headroom. This **inverts** the old "dense FP8 = memory-only" rule
-  at low concurrency: a branchless E4M3 dequant (the FP8-dequant breakthrough) lifted dense FP8 above
-  FP16 for single-/low-user decode. FP8's value here is now **both** memory *and* low-user speed. Both
-  load and generate coherent text.
-- **single / multi-user tok/s:** see the matrix table below. **FP8 wins C1–C2** (35.3 / 28.3 vs FP16
-  26.7 / 24.1); the curves **cross at ~C4** (FP8 19.7 vs FP16 21.4); **FP16 takes C4–C8** (C8 agg
-  **137** vs FP8 **101**).
-- **Why FP16 reclaims high concurrency:** dense decode streams the *entire* weight set every token, and
-  our FP8 dequant runs on **CUDA cores** while FP16 decode reaches cuBLAS **tensor cores** that scale
-  better with batch. So at C4–C8 the per-token compute wall favours FP16; sparse-MoE models sidestep it
-  via per-token sparsity (see GLM-4.5-Air / Qwen3.6-35B-A3B, where FP8 wins at *every* concurrency). A
-  tensor-core / WMMA FP8 decode kernel would close the dense gap (future work, no timeline). (Kernel:
-  `src/fp8_w8a16_sm70/fp8_dequant.cu`.)
-- **Lower-TP option (the memory play):** FP8 also fits at **TP2** (½ the cards, short context ≤ 8192) —
-  23.1 tok/s C1, 55.7 agg @C8 — so you can serve gemma-4-31B on **2×V100 instead of 4**, freeing cards
-  for other models. FP16 needs TP4.
-- **0.19 vs 0.21:** within noise on both precisions (FP16 26.73 = 26.73 @C1; FP8 35.28 vs 35.23 @C1;
-  C8 agg 136.7 vs 136.8 FP16 / 101.5 vs 101.8 FP8) — a **portability** result. FP8 is our sm_70 kernel,
-  so it's engine-invariant by construction.
-- **Cold TTFT:** dense gemma-4 prefill is the slow part on Volta — **~185–196 s** cold monolithic at
-  TP4 (untuned-prefill state, comparable on both engines and precisions). Decode is the story here;
-  prefill tuning is future work.
-- **Exactness:** both FP16 and FP8 are **Exact** (deterministic greedy), quality=pass; all 5-test
-  categories coherent on both engines.
+A dense 31B (`Gemma4ForConditionalGeneration`, 60 layers, no MoE). After the branchless-dequant
+breakthrough, **FP8 is *faster* than FP16 at low concurrency** (35 vs 27 at C1) at half the weight
+footprint; FP16 reclaims the 8-user aggregate (the dense CUDA-core-vs-tensor-core wall, Chapter 5).
+
+## Family / checkpoints
+- `google/gemma-4-31B-it` — FP16 baseline.
+- `RedHatAI/gemma-4-31B-it-FP8-Dynamic` — FP8 plugin path.
+- **Compatibility:** needs **transformers 5** on vLLM 0.19 (the `vllm019-tf5` image; stock 0.19's
+  tf 4.57 can't parse `model_type=gemma4`); runs on **0.21 stock** (its base ships tf5). Dense → MoE
+  patch n/a; FP8 plugin works on both engines. (Chapter 6 matrix.)
+
+## Fit / compatibility
+- **TP4** on 4×V100. FP16 ~62 GB → ~15.5 GB/GPU; FP8 ~31 GB → ~7.8 GB/GPU (half the bytes →
+  ~1.55× more KV headroom).
+- `--max-num-batched-tokens ≥ 2496` is **required on 0.21** (Gemma-4's vision tower forces it; the
+  2048 default fails at startup). Text decode is insensitive to the value.
+- **FP8 also fits at TP2** (2 cards, short context) — the half-GPU option.
+- **Best engine:** within noise on both precisions (FP8 is our engine-invariant kernel; FP16 is a
+  portability result).
+
+## Single-user deployment summary
+*What one stream gets at C1, per engine — the precision/TP choice for a solo user or small lab.*
+
+<!-- render:single_user:gemma4_31b -->
+| vLLM | FP16<br>TP4 | FP8<br>TP4 | FP8<br>TP2 |
+|---|---:|---:|---:|
+| 0.19 | 26.73 | 35.23 | — |
+| 0.21 | 26.73 | 35.28 | 23.07 |
+<!-- endrender -->
+
+**FP8 beats FP16 at C1** (35.3 vs 26.7) — the value here is *both* memory and low-user speed. The
+half-GPU **FP8 TP2** (~23 tok/s) lets you serve gemma-4-31B on 2 cards.
+
+## Concurrency shape
+*At a comparable serving config (same TP), how precision/engine scales C1→C8. Each config has two rows:
+**per-user** = one stream; **aggregate** = total box throughput.*
+
+<!-- render:concurrency:gemma4_31b -->
+| Config | Type | C1 | C2 | C4 | C8 |
+|---|---|---:|---:|---:|---:|
+| 0.19 FP16 TP4 | per-user | 26.73 | 24.17 | 21.44 | 17.1 |
+|  | aggregate | 26.73 | 48.34 | 85.76 | 136.79 |
+| 0.19 FP8 TP4 | per-user | 35.23 | 28.19 | 19.67 | 12.72 |
+|  | aggregate | 35.23 | 56.38 | 78.68 | 101.78 |
+| 0.21 FP16 TP4 | per-user | 26.73 | 24.07 | 21.43 | 17.08 |
+|  | aggregate | 26.73 | 48.14 | 85.72 | 136.66 |
+| 0.21 FP8 TP4 | per-user | 35.28 | 28.25 | 19.65 | 12.68 |
+|  | aggregate | 35.28 | 56.5 | 78.6 | 101.47 |
+<!-- endrender -->
+
+FP8 wins C1–C2, the curves **cross at ~C4**, and **FP16 takes the C8 aggregate** (137 vs 101) — dense
+decode streams the whole weight set every token, where our CUDA-core dequant doesn't scale with batch
+like cuBLAS tensor cores (Chapter 5).
+
+## Caveats
+- Both FP16 and FP8 are **Exact** (deterministic greedy); all categories coherent.
+- **Cold TTFT ~185–196 s** — dense gemma-4 prefill is the slow part on Volta (untuned-prefill state).
+- `max-model-len=32768`; the TP2 half-GPU option is short-context.
+
+## Raw SSOT rows
+*Rendered directly from `data/benchmark_matrix.csv`, kept for auditability. The digests are the
+recommended reading; if a digest and these rows ever disagree, **the SSOT rows win** and the
+renderer/prose is fixed.*
 
 <!-- render:model:gemma-4-31B-it -->
 | vLLM | variant | TP | users | config | per-user | agg | TTFT | result_path |

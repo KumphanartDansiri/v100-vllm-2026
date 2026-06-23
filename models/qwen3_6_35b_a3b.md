@@ -24,7 +24,7 @@ pays off and never hits the dense CUDA-core wall (each token touches only a few 
 *What one stream gets at C1, per engine — the precision/TP choice for a solo user or small lab.*
 
 <!-- render:single_user:qwen3_6_35b_a3b -->
-| vLLM | FP16 TP4 | FP8 TP4 | FP8 TP2 |
+| vLLM | FP16<br>TP4 | FP8<br>TP4 | FP8<br>TP2 |
 |---|---:|---:|---:|
 | 0.19 | 63.3 | 89.92 | — |
 | 0.21 | 55.93 | 74.92 | 71.0 |

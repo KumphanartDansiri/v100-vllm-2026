@@ -23,7 +23,7 @@ TP. FP16 reclaims the 8-user aggregate (the dense CUDA-core-vs-tensor-core wall,
 *What one stream gets at C1, per engine — the precision/TP choice for a solo user or small lab.*
 
 <!-- render:single_user:qwen3_6_27b -->
-| vLLM | FP16 TP4 | FP8 TP4 | FP8 TP2 |
+| vLLM | FP16<br>TP4 | FP8<br>TP4 | FP8<br>TP2 |
 |---|---:|---:|---:|
 | 0.19 | 40.05 | 54.35 | 35.13 |
 | 0.21 | 35.37 | 46.13 | 31.69 |
