@@ -43,7 +43,7 @@ separately where it applies.
 4. [MTP / speculative decode](docs/04_mtp.md) — where it helps, kept separate from base decode.
 5. [The FP8 plugin](docs/05_fp8_plugin.md) — custom W8A16 sm_70 kernels; FP8 as a decode-*speed* path
    (beats FP16 at low concurrency, and across *all* concurrency for MoE), not just a residency trick.
-6. Model pages — one per family (7), [template](docs/06_model_results_template.md):
+6. [Model pages](docs/06_model_results_template.md) — one per family (7):
    [Qwen3.6-27B](models/qwen3_6_27b.md) ·
    [Qwen3.6-35B-A3B](models/qwen3_6_35b_a3b.md) ·
    [Qwen3.5-122B-A10B](models/qwen3_5_122b_a10b.md) ·
