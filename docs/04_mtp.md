@@ -24,7 +24,7 @@ depends on the model and precision.** Two reads off the sweep:
   **hurts** (0.95×). Once decode is already fast, k=1 spec-decode is net-negative.
 - **The best k is model-dependent:** on the TP8 **122B MoE** (comm-bound — an 8-way all-reduce every
   step) the win **climbs to 1.67× at k=4**; on the already-fast **35B-A3B FP8** it **peaks at k=2
-  (1.24×) then declines**; on **dense 27B** it never beats base decode at any k.
+  (1.24×) then declines**; on **dense 27B** it does not beat base decode in the measured k=1–2 sweep.
 
 ## The k-sweep (cudagraph, single-stream)
 
@@ -45,8 +45,8 @@ depends on the model and precision.** Two reads off the sweep:
 <!-- endrender -->
 
 This is the **measured** sweep, not an exhaustive grid: k≥2 was run where it mattered (the FP8 MoE and
-dense models); the FP16 and gemma cells are k=1. Read it with the acceptance/exactness columns, not
-tok/s alone:
+dense models); the FP16 comparison is k=1 only, and gemma is reported as unsupported/n/a rather than
+assigned a number. Read it with the acceptance/exactness columns, not tok/s alone:
 - **Acceptance% is a perf signal, not a usability one.** High acceptance with garbage output is a
   known trap — pair it with exactness/coherence. (Here: 27B-FP8 is token-for-token **Exact** with
   acceptance 88% but *slower* at 0.73× — acceptance was high, speed still lost.)
@@ -64,8 +64,8 @@ that amortizing it over more speculated tokens keeps paying — the sweep climbs
 → 1.67×** from k=1 to k=4, *even as acceptance falls* (87% → 57%), because each accepted token still
 skips a full all-reduce-bound decode step. Capturing k≥2 under cudagraph on Volta took one fix — raising
 the grouped-MoE route-slot cap (`MAX_ROUTE_SLOTS=512`); without it the k≥2 capture aborts. By contrast
-the fast 35B-A3B FP8 tops out at **k=2** and dense 27B never breaks even — same "amortize the fixed
-cost" rule, different amounts of fixed cost to amortize.
+the fast 35B-A3B FP8 tops out at **k=2** and dense 27B does not break even in the measured k=1–2 sweep
+— same "amortize the fixed cost" rule, different amounts of fixed cost to amortize.
 
 ## Takeaway for readers
 **MTP is an optional operating mode, not the default benchmark mode.** Exactness-sensitive deployments
