@@ -2,6 +2,7 @@
 
 **Upstream:** `flash-attention-v100` by D. Skryabin (ai-bond). **License:** BSD-3-Clause.
 **Channel:** GitHub `github.com/ai-bond/flash-attention-v100` (PR or issue) · Telegram @ai_bond007.
+**Copy-paste submission:** [github_issue.md](github_issue.md) (self-contained, diffs inlined).
 **Narrative:** [../../acknowledgements/flash_attention_v100.md](../../acknowledgements/flash_attention_v100.md).
 
 ## What we observed

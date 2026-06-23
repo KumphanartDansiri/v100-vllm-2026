@@ -1,7 +1,12 @@
-# Draft issue — fused-MoE small-M decode default (`BLOCK_SIZE_K=128`) is pathological on sm_70
+# Copy-paste submission — vLLM (fused-MoE Volta config)
 
-*Draft text for a `vllm-project/vllm` issue. Framed as a finding + a question, not an sm_70-support
-request. Numbers are V100-only; the cross-arch question is raised honestly, not asserted.*
+*Paste the body into a GitHub issue on `vllm-project/vllm`. Tone: a measured config/default finding —
+**not** a request for broad V100 support. The two JSONs in [configs/](configs/) are the attachable data.
+Numbers are V100-only; the cross-arch question is raised honestly, not asserted.*
+
+---
+
+**Title:** Volta fused-MoE decode config: `BLOCK_SIZE_K=128` causes 4–9× slowdown on V100
 
 ---
 
