@@ -4,6 +4,14 @@
 **Channel:** a GitHub **issue** (the diagnostic) + a **data/config PR** (the two JSONs).
 **Narrative:** [../../acknowledgements/vllm.md](../../acknowledgements/vllm.md).
 
+## Maintainer quick path
+*If you maintain vLLM and only have five minutes:*
+1. **Read** — [moe_block_k_issue.md](moe_block_k_issue.md): a measured config finding, **not** a V100-support ask.
+2. **Artifacts** — [configs/](configs/): two drop-in V100 MoE config JSONs (exact `get_moe_configs` names) + provenance.
+3. **Reproducer** — `tools/moe_stages_ab_vllm021.sh` in the fp8-w8a16-sm70 repo (e2e A/B: stock vs fix).
+4. **Ask** — the config JSONs as a data PR; the diagnostic as an issue *if* the small-M default question is worth a look.
+5. **Status** — prepared, not yet sent.
+
 ## What we observed
 On V100 (sm_70), stock **fp16/bf16 fused-MoE decode is slower than a same-class dense model** — backwards
 for a sparse MoE (Qwen3.6-35B-A3B 15.6 tok/s vs 27B-dense 37–41; gemma-4-26B-A4B 10.9 vs 31B-dense 17.6).

@@ -2,6 +2,8 @@
 
 > **Status: Final** — contribution status as of the freeze.
 
+**Ready-to-send packet:** [../upstream_feedback/vllm/](../upstream_feedback/vllm/) — the diagnostic issue + the drop-in V100 config JSONs.
+
 **Upstream:** **vLLM** (vllm-project). **License: Apache-2.0.** We run **both** the **0.19.x** and
 **0.21.x** lines, source-built on a CUDA-12.6 toolchain.
 

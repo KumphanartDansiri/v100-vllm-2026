@@ -8,6 +8,14 @@ license). **Channel:** GitHub (issue / discussion).
 > ours; we imported none of their code and they need none of ours. What's here is *mutual technical
 > acknowledgement* — two cross-checks that helped us, offered back in case they're useful to them.
 
+## Maintainer quick path
+*If you're from 1CatAI and only have five minutes:*
+1. **Read** — [comparison_notes.md](comparison_notes.md): the shared MTP/CUDA-graph hazard + the FA-integration contrast.
+2. **Artifacts** — none; this is notes, not code.
+3. **Reproducer** — n/a.
+4. **Ask** — corrections to our reading of your design / mutual acknowledgement only.
+5. **Status** — notes only; nothing to merge.
+
 ## What we'd share (notes, not patches)
 - **A shared speculative-decoding hazard.** Both efforts hit the same class of bug: under CUDA-graph
   capture, padding desynchronises the speculative-token mask from the sequence-length metadata, giving

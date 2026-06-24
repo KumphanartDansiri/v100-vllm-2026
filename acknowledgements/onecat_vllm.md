@@ -2,6 +2,8 @@
 
 > **Status: Final** — an independent parallel effort; credited here, no code imported.
 
+**Notes packet:** [../upstream_feedback/onecat_vllm/](../upstream_feedback/onecat_vllm/) — the comparison notes (no code).
+
 **Upstream:** **1Cat-vLLM** by **1CatAI** — an independent Tesla-V100 / sm\_70 vLLM fork (1.0.0,
 mid-2026) carrying AWQ-4bit sm\_70 kernels, a FlashAttention-V100 backend, FP8 (`e5m2`) KV cache, and
 MTP speculative decoding for Qwen3.6. See the upstream repository for its license.
@@ -28,6 +30,6 @@ Their FP8 MoE rides TurboMind `s884` W8A16 kernels (block-quantised, 128×128); 
 path trades that for per-layer block/channel flexibility. Different bets, same goal.
 
 ## Credit
-1CatAI's work stands on its own and predates none of ours / postdates none of ours — it's genuinely
-parallel. We're glad the "V100 in 2026" case is being made by more than one team, and we acknowledge
-their fork as part of that shared effort.
+1CatAI's work stands on its own — genuinely parallel, neither derived from ours nor a basis for it.
+We're glad the "V100 in 2026" case is being made by more than one team, and we acknowledge their fork
+as part of that shared effort.

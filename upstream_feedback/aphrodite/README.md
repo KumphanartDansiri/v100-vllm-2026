@@ -9,6 +9,14 @@
 > Volta contribution land more naturally here than on vLLM. The materials are kept ready in case the
 > project (or its users) want them.
 
+## Maintainer quick path
+*If you maintain aphrodite-engine and only have five minutes:*
+1. **Read** — [sm70_build_rewire.md](sm70_build_rewire.md) (build re-enable) + [moe_patch_plan.md](moe_patch_plan.md) (the MoE PR).
+2. **Artifacts** — the 4-commit rewire + cu126 Dockerfile diff are implementation-side (`aphrodite_salvage_archive/v100-sm70-patches/`, available on request); the MoE config JSONs are shared with [../vllm/configs/](../vllm/configs/).
+3. **Reproducer** — build with the cu126 Dockerfile + the bundled `smoke_gemma4.sh` (gemma-4-31B ≈ 29 tok/s).
+4. **Ask** — if broad V100 support is wanted, the parked PR path; request the patch branch.
+5. **Status** — prepared, parked behind the vLLM line.
+
 ## What we observed / why it matters
 Two contributions, both in scope for aphrodite where they aren't for vLLM:
 1. **sm_70 is droppable-but-recoverable.** Stock aphrodite 0.21 drops Volta like stock vLLM 0.21; a

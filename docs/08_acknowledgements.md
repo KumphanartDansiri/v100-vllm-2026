@@ -65,4 +65,5 @@ FlashAttention-V100 fork is **BSD-3-Clause** (© D. Skryabin); vLLM is **Apache-
 offered in the same spirit: take them, measure them, report back.
 
 *If you maintain one of these projects and want a contribution shaped differently — a PR instead of a
-report, or vice-versa — that's welcome; the project page says how to reach the work.*
+report, or vice-versa — that's welcome; each project's packet under
+[`upstream_feedback/`](../upstream_feedback/) opens with a five-minute "maintainer quick path."*

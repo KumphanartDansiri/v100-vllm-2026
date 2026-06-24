@@ -5,6 +5,14 @@
 **Copy-paste submission:** [github_issue.md](github_issue.md) (self-contained, diffs inlined).
 **Narrative:** [../../acknowledgements/flash_attention_v100.md](../../acknowledgements/flash_attention_v100.md).
 
+## Maintainer quick path
+*If you maintain flash-attention-v100 and only have five minutes:*
+1. **Read** — [github_issue.md](github_issue.md): paste-ready, the two fixes inlined as diffs.
+2. **Artifacts** — [ccb6557.patch](ccb6557.patch) (3 files, +4/−4; `git am` it).
+3. **Reproducers** — [reproducers.md](reproducers.md): the paged-straddle smoke + the strided-Q check.
+4. **Ask** — take the patch, re-derive it, or tell us the issue/PR format you'd prefer.
+5. **Status** — prepared, not yet sent.
+
 ## What we observed
 Integrating the kernel as the prefill backend for vLLM on 8×V100 (paged KV via the low-level
 `varlen_fwd`) surfaced three things — one correctness bug, one build-portability fix, one caller gotcha:
