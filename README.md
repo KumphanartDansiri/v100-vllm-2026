@@ -60,10 +60,12 @@ separately where it applies.
    [vLLM](acknowledgements/vllm.md) ·
    [aphrodite-engine](acknowledgements/aphrodite.md) ·
    [1Cat-vLLM (1CatAI)](acknowledgements/onecat_vllm.md)
+9. [Precision × TP comparison](docs/09_precision_tp_comparison.md) — exact Qwen3.5 dense and MoE
+   examples comparing FP16, FP8 W8A16, and GPTQ-Int4 at TP4 vs TP2.
 
 ## Status
 
-This repo is at the **frozen publication checkpoint**: Chapter 1, Chapters 2–8, and all
+This repo is at the **frozen publication checkpoint**: Chapter 1, Chapters 2–9, and all
 model-family pages are reconciled to the dual-engine SSOT matrix (frozen at tag
 `fp8-v100-2026-matrix`). Cells we have not measured are shown **absent, never zero**.
 
