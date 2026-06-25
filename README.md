@@ -43,7 +43,9 @@ separately where it applies.
 4. [MTP / speculative decode](docs/04_mtp.md) — where it helps, kept separate from base decode.
 5. [The FP8 plugin](docs/05_fp8_plugin.md) — custom W8A16 sm_70 kernels; FP8 as a decode-*speed* path
    (beats FP16 at low concurrency, and across *all* concurrency for MoE), not just a residency trick.
-6. [Model pages](docs/06_model_results_template.md) — one per family (7):
+6. [Model pages](docs/06_model_results_template.md) — one per family (9). The **featured Qwen3.5 pair** (full TTFT + exactness profile — [Ch.10](docs/10_qwen35_featured_family.md)):
+   [**Qwen3.5-27B**](models/qwen3_5_27b.md) ·
+   [**Qwen3.5-35B-A3B**](models/qwen3_5_35b_a3b.md) — then the broad-baseline families (3.6 is the same config as 3.5, run wide):
    [Qwen3.6-27B](models/qwen3_6_27b.md) ·
    [Qwen3.6-35B-A3B](models/qwen3_6_35b_a3b.md) ·
    [Qwen3.5-122B-A10B](models/qwen3_5_122b_a10b.md) ·
@@ -62,10 +64,13 @@ separately where it applies.
    [1Cat-vLLM (1CatAI)](acknowledgements/onecat_vllm.md)
 9. [Precision × TP comparison](docs/09_precision_tp_comparison.md) — exact Qwen3.5 dense and MoE
    examples comparing FP16, FP8 W8A16, and GPTQ-Int4 at TP4 vs TP2.
+10. [Qwen3.5 featured family](docs/10_qwen35_featured_family.md) — the full profile of the two featured
+    checkpoints (decode + capacity + **TTFT + exactness**), and the 3.5-vs-3.6 cross-check that shows
+    the behavior is generation-independent at matched TP.
 
 ## Status
 
-This repo is at the **frozen publication checkpoint**: Chapter 1, Chapters 2–9, and all
+This repo is at the **frozen publication checkpoint**: Chapter 1, Chapters 2–10, and all
 model-family pages are reconciled to the dual-engine SSOT matrix (frozen at tag
 `fp8-v100-2026-matrix`). Cells we have not measured are shown **absent, never zero**.
 

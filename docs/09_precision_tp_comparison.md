@@ -79,5 +79,5 @@ MoE read: at TP4, FP8 wins over FP16 at every concurrency and the margin grows u
 
 - TP4 source: `results/q27b_exact_triad_20260624_113728/` and `results/q35b_exact_triad_20260624_115648/`.
 - TP2 source: `results/q27b_exact_triad_tp2_20260624_174257/` and `results/q35b_exact_triad_tp2_20260624_174257/`.
-- FP16 OOM means the fit-aware sweep marked the config infeasible at load. This was not counted as zero throughput.
+- FP16 OOM means the fit-aware sweep marked the config infeasible at load (not counted as zero throughput). The two OOMs differ in kind, confirmed in the serve logs: the **35B-A3B is a hard weight-OOM** — ~33 GB/GPU exceeds the 32 GB card *before any KV cache* (`Failed to load model — not enough GPU memory`), so it fundamentally cannot fit at TP2. The **27B is a KV-cache-room OOM** — weights (~25 GB/GPU) load, but the standard `gpu_memory_utilization=0.85` / 4096-ctx envelope leaves no room for KV blocks (`No available memory for the cache blocks`). The 27B could be coaxed onto TP2 with a tighter envelope at a degraded operating point; the 35B cannot. Both are reported "OOM" = infeasible under the *standard* serve envelope.
 - GPTQ C4 cells were noisy in both TP4 and TP2; tables use the median of two runs, matching the rest of the triad harness.

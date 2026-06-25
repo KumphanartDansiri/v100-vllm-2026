@@ -11,7 +11,8 @@ Marker convention in any .md:
 
 Usage:
   python3 scripts/render_tables.py                 # print all tables to stdout
-  python3 scripts/render_tables.py overview        # print one (overview|moe_fix|model:<name>)
+  python3 scripts/render_tables.py overview        # print one (overview|moe_fix|model:<ModelName>, e.g. model:Qwen3.5-27B)
+  #   digest views take the page KEY, not the model name: single_user|ttft|concurrency:<key>  (e.g. single_user:qwen3_5_27b)
   python3 scripts/render_tables.py --inject         # inject into all docs/ + models/ files
   python3 scripts/render_tables.py --inject FILE    # inject into one file
 """
@@ -151,7 +152,9 @@ def eager_cudagraph():
 
 # ---- Chapter 1 dual-engine tables (perf_v2 rows = implementation_ref set) -------------------
 def _pv2(r):
-    return bool(r["implementation_ref"])
+    # Ch1 dual-engine matrix = the broad 32768-ctx perf_v2 rows. Exclude the Qwen3.5
+    # short-context (4096) exact-triad study rows — they live in their own model pages + Ch9/10.
+    return bool(r["implementation_ref"]) and r["implementation_ref"] != "qwen35-exact-triad"
 
 
 def short(name):                       # official checkpoint -> family short name
@@ -289,6 +292,18 @@ DIGEST_SPECS = {
         "configs": [("FP16 TP4", "fp16", "4"), ("FP8 TP4", "fp8", "4"),
                     ("FP8 TP2", "fp8", "2", "single_user")],   # half-GPU = a fit option, not scaling
     },
+    "qwen3_5_27b": {
+        "match": "Qwen3.5-27B",
+        "engines": ["0.21.0"],
+        "configs": [("FP16 TP4", "fp16", "4"), ("FP8 TP4", "fp8", "4"),
+                    ("FP8 TP2", "fp8", "2", "single_user")],   # half-GPU = a fit option
+    },
+    "qwen3_5_35b_a3b": {
+        "match": "Qwen3.5-35B-A3B",
+        "engines": ["0.21.0"],
+        "configs": [("FP16 TP4", "fp16", "4"), ("FP8 TP4", "fp8", "4"),
+                    ("FP8 TP2", "fp8", "2", "single_user")],   # half-GPU = a fit option
+    },
     "qwen3_5_122b_a10b": {
         "match": "Qwen3.5-122B-A10B",
         "engines": ["0.19.0", "0.21.0"],
@@ -321,7 +336,7 @@ DIGEST_SPECS = {
 
 def _digest_row(match, eng, variant, tp, users):
     for r in rows:
-        if (r["implementation_ref"] == PV2 and match in r["model"] and r["vllm_version"] == eng
+        if (r["implementation_ref"] in (PV2, "qwen35-exact-triad") and match in r["model"] and r["vllm_version"] == eng
                 and r["variant"] == variant and r["tp"] == tp and r["users"] == users):
             return r
     return None
