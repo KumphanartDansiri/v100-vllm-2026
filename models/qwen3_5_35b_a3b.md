@@ -1,6 +1,6 @@
 # Qwen3.5-35B-A3B (MoE — FP16 + FP8 + GPTQ-Int4) — V100 model-family page
 
-> **Status: DRAFT** — featured Qwen3.5 MoE example. Digest tables render from `data/benchmark_matrix.csv` (06-24/25 exact-triad + perf_v2 rows, engine 0.21); raw SSOT table at the bottom. Precision × tensor-parallelism (incl. GPTQ-Int4 and the TP2 capacity result) is [Chapter 9](../docs/09_precision_tp_comparison.md); full profile (TTFT + exactness + 3.5-vs-3.6) is [Chapter 10](../docs/10_qwen35_featured_family.md).
+> **Status: Final** — featured Qwen3.5 MoE example. Digest tables render from `data/benchmark_matrix.csv` (06-24/25 exact-triad + perf_v2 rows, engine 0.21); raw SSOT table at the bottom. Precision × tensor-parallelism (incl. GPTQ-Int4 and the TP2 capacity result) is [Chapter 5](../docs/05_fp8_plugin.md).
 
 A sparse MoE (~3B of 35B active/token) — the featured worked example for the *MoE* side. This is where the V100 FP8 path is strongest: **FP8 wins decode at every concurrency** (the reduced weight traffic stays valuable when only ~3B params move per token — the architecture-fit case, [Chapter 5](../docs/05_fp8_plugin.md)), **and** it's the only faithful format that **fits at half TP**. The cost is prefill: the block-FP8 MoE cold-prefill is the slowest cell in the report.
 
@@ -8,10 +8,10 @@ A sparse MoE (~3B of 35B active/token) — the featured worked example for the *
 - `Qwen/Qwen3.5-35B-A3B` — FP16 baseline (stock vLLM + the FP16-MoE config fix, [Chapter 2](../docs/02_fp16_moe_fix.md)).
 - `Qwen/Qwen3.5-35B-A3B-FP8` — FP8 W8A16 plugin path (grouped/coalesced MoE decode).
 - `Qwen/Qwen3.5-35B-A3B-GPTQ-Int4` — GPTQ re-quant (stock vLLM, lossy).
-- Same config as Qwen3.6-35B-A3B; behavior matches at equal TP ([Chapter 10](../docs/10_qwen35_featured_family.md)).
+- Same config as Qwen3.6-35B-A3B; behavior matches at equal TP ([Chapter 5](../docs/05_fp8_plugin.md)).
 
 ## Fit / compatibility
-- **FP16 (~66 GB):** runs at **TP4**; **hard OOM at TP2** — ~33 GB of weights per GPU exceeds the 32 GB card *before* any KV cache (Ch.9). FP16 simply cannot make a half-GPU deployment.
+- **FP16 (~66 GB):** runs at **TP4**; **hard OOM at TP2** — ~33 GB of weights per GPU exceeds the 32 GB card *before* any KV cache (Ch.5). FP16 simply cannot make a half-GPU deployment.
 - **FP8 (~34 GB, resident):** **TP4 and TP2** both fit (~17 GB/GPU at TP2) — FP8 is what enables the half-GPU MoE.
 - **GPTQ-Int4 (~22 GB):** TP4 and TP2 fit; stock vLLM (0.18/cu128 here).
 
@@ -54,7 +54,7 @@ This is the FP8 cost side and it is steep: the **block-FP8 MoE cold prefill is ~
 |  | Aggregate | 92.96 | 155.18 | 289.42 | 439.42 |
 <!-- endrender -->
 
-**FP8 wins per-user at every concurrency** and the margin grows with load (1.40× at C1 → 2.45× at C4) — FP16-MoE decode collapses under concurrency while FP8 holds. GPTQ-Int4 is fastest raw but lossy; the full FP16/FP8/Int4 triad and the TP2 column are in [Chapter 9](../docs/09_precision_tp_comparison.md).
+**FP8 wins per-user at every concurrency** and the margin grows with load (1.40× at C1 → 2.45× at C4) — FP16-MoE decode collapses under concurrency while FP8 holds. GPTQ-Int4 is fastest raw but lossy; the full FP16/FP8/Int4 triad and the TP2 column are in [Chapter 5](../docs/05_fp8_plugin.md).
 
 ## Caveats
 - FP8 is **Exact** (bit-deterministic greedy, 1 sha/5) — tighter than the 3.6-35B-A3B-FP8, which was only "Stable". FP8-vs-FP16 greedy output is **Stable** (coherent, token-divergent).

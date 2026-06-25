@@ -55,6 +55,8 @@ headline FP8 win is the routed-expert kernels, not the patch.
 env-gated MLA patches (local, sm_70) unblock it on either engine. Decode rides stock TritonMLA.
 
 ## Family pages
+- [**Qwen3.5-27B**](../models/qwen3_5_27b.md) — **featured** dense pair; FP8 beats FP16 to ~C4, FP16 reclaims C8. Full precision×TP / TTFT / faithfulness profile in [Ch.5](05_fp8_plugin.md).
+- [**Qwen3.5-35B-A3B**](../models/qwen3_5_35b_a3b.md) — **featured** MoE pair; FP8 wins every concurrency and is the only faithful format that fits at half-TP.
 - [Qwen3.6-27B](../models/qwen3_6_27b.md) — dense; FP8 low-user speed win, FP16 takes high concurrency.
 - [Qwen3.6-35B-A3B](../models/qwen3_6_35b_a3b.md) — the clean MoE FP8 showcase (FP8 wins every concurrency).
 - [Qwen3.5-122B-A10B](../models/qwen3_5_122b_a10b.md) — flagship; FP8 vs GPTQ-Int4 at TP8.

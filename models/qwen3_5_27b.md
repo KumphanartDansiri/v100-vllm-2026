@@ -1,6 +1,6 @@
 # Qwen3.5-27B (dense — FP16 + FP8 + GPTQ-Int4) — V100 model-family page
 
-> **Status: DRAFT** — featured Qwen3.5 dense example. Digest tables render from `data/benchmark_matrix.csv` (06-24/25 exact-triad + perf_v2 rows, engine 0.21); the exhaustive raw SSOT table is at the bottom. The precision × tensor-parallelism story (incl. GPTQ-Int4 and the TP2 capacity result) is [Chapter 9](../docs/09_precision_tp_comparison.md); the full profile (TTFT + exactness + 3.5-vs-3.6) is [Chapter 10](../docs/10_qwen35_featured_family.md).
+> **Status: Final** — featured Qwen3.5 dense example. Digest tables render from `data/benchmark_matrix.csv` (06-24/25 exact-triad + perf_v2 rows, engine 0.21); the exhaustive raw SSOT table is at the bottom. The precision × tensor-parallelism story (incl. GPTQ-Int4 and the TP2 capacity result) is [Chapter 5](../docs/05_fp8_plugin.md).
 
 A dense 27B — the featured worked example for the *dense* side of the architecture-fit line. The V100 story: since the branchless E4M3 dequant, **FP8 decodes *faster* than FP16 at low concurrency** at the same TP, and fits at a lower TP floor; **FP16 reclaims the 8-user aggregate** (the dense CUDA-core-vs-tensor-core wall, [Chapter 5](../docs/05_fp8_plugin.md)). GPTQ-Int4 is fastest raw but lossy.
 
@@ -8,10 +8,10 @@ A dense 27B — the featured worked example for the *dense* side of the architec
 - `Qwen/Qwen3.5-27B` — FP16 baseline (stock vLLM).
 - `Qwen/Qwen3.5-27B-FP8` — FP8 W8A16 plugin path.
 - `Qwen/Qwen3.5-27B-GPTQ-Int4` — GPTQ re-quant (stock vLLM, lossy).
-- Architecturally the same config as Qwen3.6-27B; behavior matches once TP is held equal ([Chapter 10](../docs/10_qwen35_featured_family.md)).
+- Architecturally the same config as Qwen3.6-27B; behavior matches once TP is held equal ([Chapter 5](../docs/05_fp8_plugin.md)).
 
 ## Fit / compatibility
-- **FP16 (~52 GB):** runs at **TP4**; **OOM at TP2** under the standard serve envelope (weights ~25 GB/GPU leave no KV-cache headroom — see Ch.9).
+- **FP16 (~52 GB):** runs at **TP4**; **OOM at TP2** under the standard serve envelope (weights ~25 GB/GPU leave no KV-cache headroom — see Ch.5).
 - **FP8 (~29 GB, resident):** **TP4 and TP2** both fit; half-GPU deployment is a real option.
 - **GPTQ-Int4 (~29 GB):** TP4 and TP2 fit; stock vLLM (0.18/cu128 here).
 
@@ -54,7 +54,7 @@ Here the **FA-V100 bridge roughly halves cold TTFT** (FP8 32→17 s, FP16 27→1
 |  | Aggregate | 52.50 | 85.03 | 126.89 | 162.34 |
 <!-- endrender -->
 
-FP8 leads per-user through ~C4; **FP16 reclaims the C8 aggregate** — the dense CUDA-core dequant doesn't scale with batch like cuBLAS tensor cores ([Chapter 5](../docs/05_fp8_plugin.md)). GPTQ-Int4 is fastest raw at every point but is the lossy re-quant (full triad in Ch.9).
+FP8 leads per-user through ~C4; **FP16 reclaims the C8 aggregate** — the dense CUDA-core dequant doesn't scale with batch like cuBLAS tensor cores ([Chapter 5](../docs/05_fp8_plugin.md)). GPTQ-Int4 is fastest raw at every point but is the lossy re-quant (full triad in Ch.5).
 
 ## Caveats
 - FP8 is **Exact** (bit-deterministic greedy, 1 sha/5); all categories coherent. FP8-vs-FP16 greedy output is **Stable** (coherent, token-divergent — different numerics, not errors).
