@@ -19,10 +19,19 @@ A dense 27B — the featured worked example for the *dense* side of the architec
 *What one stream expects at C1 — decode throughput per engine.*
 
 <!-- render:single_user:qwen3_5_27b -->
-| Choice | 0.19 C1 Decode | 0.21 C1 Decode |
-|---|---:|---:|
-| FP16* TP4 | 40.04 tok/s | 35.43 tok/s |
-| FP8 TP4 | 54.05 tok/s | 46.05 tok/s |
+| Choice | Type | 0.19 | 0.21 |
+|---|---|:---:|:---:|
+| FP16* TP4 | Decode | 40.04 tok/s | 35.43 tok/s |
+|  | Exactness | ✓ | ✓ |
+|  | Correctness | ✓ | ✓ |
+| FP8 TP4 | Decode | 54.05 tok/s | 46.05 tok/s |
+|  | Exactness | ✓ | ✓ |
+|  | Correctness | ✓ | ✓ |
+| GPTQ-Int4 TP4 ⚠ speed-only | Decode | 60.47 tok/s | 50.36 tok/s |
+|  | Exactness | ✗ | ✗ |
+|  | Correctness | ✗ | ✗ |
+
+_**Decode** = per-user tok/s at C1. **Exactness** ✓ = bit-identical run-to-run (temp 0). **Correctness** ✓ = coherent, usable output. So ✗ exactness / ✓ correctness = not bit-exact but coherent (e.g. FP8/MoE routing drift — expected, not an error); ✗ / ✗ = degenerate output (the GPTQ-Int4 27B case)._
 
 _\*BF16 checkpoint, served as FP16 on V100 (sm_70 has no native BF16; `--dtype float16`) — the decode/latency numbers are FP16 runtime._
 <!-- endrender -->
@@ -39,6 +48,8 @@ Same-card (TP4) **FP8 beats FP16** at one user; the **half-GPU FP8 TP2** option 
 |  | 0.21 | 26.96 s | 11.23 s | — |
 | FP8 TP4 | 0.19 | 34.89 s | — | — |
 |  | 0.21 | 32.21 s | 16.65 s | — |
+| GPTQ-Int4 TP4 ⚠ speed-only | 0.19 | 29.52 s | — | — |
+|  | 0.21 | 26.90 s | — | — |
 
 All TTFT is single-stream, chunked-prefill **on** (the project-standard serve — disabling chunked prefill is a known V100 crash-causer). **Cold first-token** = a fresh, cache-cold request prefilling the full ~22.6k-token prompt (worst case); **Prefix-cache-hit** = the same prompt with its prefix already cached — repeated or shared context (best case). Cold TTFT is prefill-bound, and the Qwen **block-FP8** checkpoints carry a large prefill penalty on V100 (an unoptimized FP8-prefill path, worst on the MoE models) — a latency-side current-state limit, not where FP8's *decode* win lives; compressed-tensors FP8 (Gemma/GLM) and FP16/Int4 prefill cheaper.
 
@@ -57,10 +68,14 @@ Here the **FA-V100 bridge roughly halves cold TTFT** (FP8 32→17 s, FP16 27→1
 |  | Aggregate | 40.04 | 63.03 | 123.88 | 242.07 |
 | 0.19 FP8 TP4 | Per-user | 54.05 | 42.83 | 30.83 | 20.43 |
 |  | Aggregate | 54.05 | 85.66 | 123.32 | 163.46 |
+| 0.19 GPTQ-Int4 TP4 ⚠ speed-only | Per-user | 60.47 | 48.12 | 44.92 | 40.19 |
+|  | Aggregate | 60.47 | 96.24 | 179.67 | 321.50 |
 | 0.21 FP16* TP4 | Per-user | 35.43 | 28.46 | 27.72 | 27.40 |
 |  | Aggregate | 35.43 | 56.93 | 110.87 | 219.19 |
 | 0.21 FP8 TP4 | Per-user | 46.05 | 37.06 | 28.41 | 19.44 |
 |  | Aggregate | 46.05 | 74.12 | 113.63 | 155.52 |
+| 0.21 GPTQ-Int4 TP4 ⚠ speed-only | Per-user | 50.36 | 41.25 | 38.82 | 34.90 |
+|  | Aggregate | 50.36 | 82.50 | 155.30 | 279.24 |
 
 _\*BF16 checkpoint, served as FP16 on V100 (sm_70 has no native BF16; `--dtype float16`) — the decode/latency numbers are FP16 runtime._
 <!-- endrender -->

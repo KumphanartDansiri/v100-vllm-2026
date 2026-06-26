@@ -32,9 +32,13 @@ FlashAttention MLA *prefill* backend. Three env-gated patches unblock it (decode
 *What one stream expects at C1 — decode throughput on each engine.*
 
 <!-- render:single_user:glm4_7_flash -->
-| Choice | 0.19 C1 Decode | 0.21 C1 Decode |
-|---|---:|---:|
-| FP16* TP4 | 35.36 tok/s | 30.97 tok/s |
+| Choice | Type | 0.19 | 0.21 |
+|---|---|:---:|:---:|
+| FP16* TP4 | Decode | 35.36 tok/s | 30.97 tok/s |
+|  | Exactness | ✓ | ✓ |
+|  | Correctness | ✓ | ✓ |
+
+_**Decode** = per-user tok/s at C1. **Exactness** ✓ = bit-identical run-to-run (temp 0). **Correctness** ✓ = coherent, usable output. So ✗ exactness / ✓ correctness = not bit-exact but coherent (e.g. FP8/MoE routing drift — expected, not an error); ✗ / ✗ = degenerate output (the GPTQ-Int4 27B case)._
 
 _\*BF16 checkpoint, served as FP16 on V100 (sm_70 has no native BF16; `--dtype float16`) — the decode/latency numbers are FP16 runtime._
 <!-- endrender -->

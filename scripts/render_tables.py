@@ -301,22 +301,24 @@ DIGEST_SPECS = {
     "qwen3_6_27b": {
         "match": "Qwen3.6-27B",
         "engines": ["0.19.0", "0.21.0"],
-        "configs": [("FP16* TP4", "fp16", "4"), ("FP8 TP4", "fp8", "4")],   # fleet TP4; TP2 = Ch5 capacity note, not scaling
+        "configs": [("FP16* TP4", "fp16", "4"), ("FP8 TP4", "fp8", "4"),
+                    ("FP8 TP2", "fp8", "2", "single_user")],   # half-GPU = a fit option, not scaling
     },
     "qwen3_6_35b_a3b": {
         "match": "Qwen3.6-35B-A3B",
         "engines": ["0.19.0", "0.21.0"],
-        "configs": [("FP16* TP4", "fp16", "4"), ("FP8 TP4", "fp8", "4")],   # fleet TP4; TP2 = Ch5 capacity note, not scaling
+        "configs": [("FP16* TP4", "fp16", "4"), ("FP8 TP4", "fp8", "4"),
+                    ("FP8 TP2", "fp8", "2", "single_user")],   # half-GPU = a fit option, not scaling
     },
     "qwen3_5_27b": {
         "match": "Qwen3.5-27B",
         "engines": ["0.19.0", "0.21.0"],
-        "configs": [("FP16* TP4", "fp16", "4"), ("FP8 TP4", "fp8", "4")],   # fleet TP4; TP2 = Ch5 capacity note
+        "configs": [("FP16* TP4", "fp16", "4"), ("FP8 TP4", "fp8", "4"), ("GPTQ-Int4 TP4", "GPTQ-Int4", "4")],   # fleet TP4 triad; TP2 = Ch5 capacity note
     },
     "qwen3_5_35b_a3b": {
         "match": "Qwen3.5-35B-A3B",
         "engines": ["0.19.0", "0.21.0"],
-        "configs": [("FP16* TP4", "fp16", "4"), ("FP8 TP4", "fp8", "4")],   # fleet TP4; TP2 = Ch5 capacity note
+        "configs": [("FP16* TP4", "fp16", "4"), ("FP8 TP4", "fp8", "4"), ("GPTQ-Int4 TP4", "GPTQ-Int4", "4")],   # fleet TP4 triad; TP2 = Ch5 capacity note
     },
     "qwen3_5_122b_a10b": {
         "match": "Qwen3.5-122B-A10B",
@@ -356,6 +358,13 @@ def _digest_row(match, eng, variant, tp, users):
     return None
 
 
+def _qmark(match, variant, tp):        # " ⚠ speed-only" if this config's output is degenerate (quality=fail)
+    fail = any("quality=fail" in r.get("notes", "") for r in rows
+               if r["implementation_ref"] in (PV2, "qwen35-exact-triad") and match in r["model"]
+               and r["variant"] == variant and r["tp"] == tp)
+    return " ⚠ speed-only" if fail else ""
+
+
 def _eng(v):
     return v[:-2] if v.endswith(".0") else v   # 0.19.0 -> 0.19
 
@@ -374,19 +383,40 @@ TTFT_NOTE = (
     "compressed-tensors FP8 (Gemma/GLM) and FP16/Int4 prefill cheaper.")
 
 
-def single_user(key):                  # C1 deployment summary: per-engine decode only (TTFT -> its own table)
+SCORECARD_NOTE = ("\n\n_**Decode** = per-user tok/s at C1. **Exactness** ✓ = bit-identical run-to-run "
+    "(temp 0). **Correctness** ✓ = coherent, usable output. So ✗ exactness / ✓ correctness = not "
+    "bit-exact but coherent (e.g. FP8/MoE routing drift — expected, not an error); ✗ / ✗ = degenerate "
+    "output (the GPTQ-Int4 27B case)._")
+
+
+def _scorecard_glyphs(notes):          # (exactness, correctness) -> ✓/✗/— from a row's notes
+    ex = (re.search(r"exactness=(\w+)", notes or "") or [None, ""])[1]
+    q = (re.search(r"quality=(\w+)", notes or "") or [None, ""])[1]
+    eg = "—" if not ex else ("✓" if ex == "Exact" else "✗")          # ✗ = not bit-exact (Stable/Fail)
+    cg = "—" if not q else ("✓" if q in ("pass", "suspect") else "✗")  # ✗ = degenerate (battery fail)
+    return eg, cg
+
+
+def single_user(key):                  # C1 deployment scorecard: Decode / Exactness / Correctness per engine
     s = DIGEST_SPECS[key]
     cfgs = [_cfg(c) for c in s["configs"]]
     engs = s["engines"]
-    head = ["Choice"] + [f"{_eng(e)} C1 Decode" for e in engs]
+    # 3-row scorecard per config (Decode / Exactness / Correctness), all model pages
+    head = ["Choice", "Type"] + [_eng(e) for e in engs]
     lines = []
     for lbl, var, tp, _ in cfgs:
-        row = [lbl]
+        dec = [lbl + _qmark(s["match"], var, tp), "Decode"]
+        exr, cor = ["", "Exactness"], ["", "Correctness"]
         for e in engs:
             r = _digest_row(s["match"], e, var, tp, "1")
-            row.append(f"{r['tok_s_per_user']} tok/s" if r else "—")
-        lines.append(row)
-    return md(head, lines, align=["l"] + ["r"] * len(engs))
+            if r:
+                dec.append(f"{r['tok_s_per_user']} tok/s")
+                eg, cg = _scorecard_glyphs(r.get("notes", ""))
+                exr.append(eg); cor.append(cg)
+            else:
+                dec.append("—"); exr.append("—"); cor.append("—")
+        lines += [dec, exr, cor]
+    return md(head, lines, align=["l", "l"] + ["c"] * len(engs)) + SCORECARD_NOTE
 
 
 def ttft(key):                         # per-engine first-token latency: cold / (FA-on cold) / prefix-cache-hit
@@ -398,7 +428,7 @@ def ttft(key):                         # per-engine first-token latency: cold / 
         for e in s["engines"]:
             r = _digest_row(s["match"], e, var, tp, "1")
             if r and (r.get("ttft_s") or r.get("ttft_prefix_hit_s") or r.get("ttft_fa_cold_s")):
-                picked.append((lbl, e, r))
+                picked.append((lbl + _qmark(s["match"], var, tp), e, r))
     has_fa = any(r.get("ttft_fa_cold_s") for _, _, r in picked)
     head = ["Choice", "Engine", "Cold First Token"] + (["FA-on Cold"] if has_fa else []) + ["Prefix-cache Hit"]
     lines = []
@@ -419,7 +449,7 @@ def concurrency(key):                  # same-TP scaling: per-config per-user/ag
         for lbl, var, tp, su_only in (_cfg(c) for c in s["configs"]):
             if su_only:                # half-GPU / fit options belong in the single-user table, not here
                 continue
-            pu = [f"{_eng(eng)} {lbl}", "Per-user"]
+            pu = [f"{_eng(eng)} {lbl}{_qmark(s['match'], var, tp)}", "Per-user"]
             ag = ["", "Aggregate"]
             seen = False
             for u in ("1", "2", "4", "8"):
@@ -445,6 +475,23 @@ def triad(key):                        # Ch5 dual-engine triad: FP16/FP8/Int4 x 
             lines.append([plabel, _eng(e)] + cells)
     _blank_repeat(lines, 0)            # blank repeated Precision — the two engine rows fold under it
     return md(["Precision", "Engine", "C1", "C2", "C4", "C8"], lines, align=["l", "l", "r", "r", "r", "r"])
+
+
+def correctness(key):                  # per-config correctness + exactness (fleet battery; engine-invariant)
+    s = DIGEST_SPECS[key]
+    cmap = {"pass": "coherent", "suspect": "coherent", "fail": "⚠ **degenerate** — speed-only, do not deploy"}
+    emap = {"Exact": "Exact (run-to-run deterministic)", "Stable": "Stable (coherent, drifts vs FP16)",
+            "Fail": "— (output broken)", "Diff": "Diff (coherent, divergent)"}
+    lines = []
+    for lbl, var, tp, _ in (_cfg(c) for c in s["configs"]):
+        r = next((rr for rr in rows if rr["implementation_ref"] in (PV2, "qwen35-exact-triad")
+                  and s["match"] in rr["model"] and rr["variant"] == var and rr["tp"] == tp), None)
+        if not r:
+            continue
+        q = (re.search(r"quality=(\w+)", r["notes"]) or [None, ""])[1]
+        e = (re.search(r"exactness=(\w+)", r["notes"]) or [None, ""])[1]
+        lines.append([lbl, cmap.get(q, q or "—"), emap.get(e, e or "—")])
+    return md(["Config", "Correctness", "Exactness"], lines, align=["l", "l", "l"])
 
 
 def resolve(cmd):                      # public entry: dispatch, then attach the FP16* footnote if present
@@ -478,6 +525,8 @@ def _dispatch(cmd):
         return concurrency(cmd.split(":", 1)[1])
     if cmd.startswith("triad:"):
         return triad(cmd.split(":", 1)[1])
+    if cmd.startswith("correctness:"):
+        return correctness(cmd.split(":", 1)[1])
     if cmd == "ttft_matrix":
         return ttft_matrix()
     return f"_(unknown render command: {cmd})_"

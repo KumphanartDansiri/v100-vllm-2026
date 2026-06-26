@@ -25,11 +25,19 @@ on 0.19). Where it runs, FP8 beats FP16 at every concurrency.
 *What one stream expects at C1 — decode throughput on each engine. FP8 is 0.21-only (— on 0.19).*
 
 <!-- render:single_user:gemma4_26b_a4b -->
-| Choice | 0.19 C1 Decode | 0.21 C1 Decode |
-|---|---:|---:|
-| FP16* TP4 | 39.47 tok/s | 44.39 tok/s |
-| FP8 TP4 | — | 72.85 tok/s |
-| FP8 TP2 | — | 60.15 tok/s |
+| Choice | Type | 0.19 | 0.21 |
+|---|---|:---:|:---:|
+| FP16* TP4 | Decode | 39.47 tok/s | 44.39 tok/s |
+|  | Exactness | ✓ | ✓ |
+|  | Correctness | ✓ | ✓ |
+| FP8 TP4 | Decode | — | 72.85 tok/s |
+|  | Exactness | — | ✓ |
+|  | Correctness | — | ✓ |
+| FP8 TP2 | Decode | — | 60.15 tok/s |
+|  | Exactness | — | ✓ |
+|  | Correctness | — | ✓ |
+
+_**Decode** = per-user tok/s at C1. **Exactness** ✓ = bit-identical run-to-run (temp 0). **Correctness** ✓ = coherent, usable output. So ✗ exactness / ✓ correctness = not bit-exact but coherent (e.g. FP8/MoE routing drift — expected, not an error); ✗ / ✗ = degenerate output (the GPTQ-Int4 27B case)._
 
 _\*BF16 checkpoint, served as FP16 on V100 (sm_70 has no native BF16; `--dtype float16`) — the decode/latency numbers are FP16 runtime._
 <!-- endrender -->

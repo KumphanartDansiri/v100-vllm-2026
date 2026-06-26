@@ -24,9 +24,13 @@ of the FP8 plugin.
 *What one stream expects at C1 — decode throughput on each engine.*
 
 <!-- render:single_user:glm4_5_air -->
-| Choice | 0.19 C1 Decode | 0.21 C1 Decode |
-|---|---:|---:|
-| FP8 TP8 | 64.67 tok/s | 65.45 tok/s |
+| Choice | Type | 0.19 | 0.21 |
+|---|---|:---:|:---:|
+| FP8 TP8 | Decode | 64.67 tok/s | 65.45 tok/s |
+|  | Exactness | ✓ | ✗ |
+|  | Correctness | ✓ | ✓ |
+
+_**Decode** = per-user tok/s at C1. **Exactness** ✓ = bit-identical run-to-run (temp 0). **Correctness** ✓ = coherent, usable output. So ✗ exactness / ✓ correctness = not bit-exact but coherent (e.g. FP8/MoE routing drift — expected, not an error); ✗ / ✗ = degenerate output (the GPTQ-Int4 27B case)._
 <!-- endrender -->
 
 **~65 tok/s single-stream** on a 106B model, on 7-year-old GPUs.

@@ -19,10 +19,19 @@ A sparse MoE (~3B of 35B active/token) — the featured worked example for the *
 *What one stream expects at C1 — decode throughput per engine.*
 
 <!-- render:single_user:qwen3_5_35b_a3b -->
-| Choice | 0.19 C1 Decode | 0.21 C1 Decode |
-|---|---:|---:|
-| FP16* TP4 | 63.51 tok/s | 56.19 tok/s |
-| FP8 TP4 | 90.45 tok/s | 74.86 tok/s |
+| Choice | Type | 0.19 | 0.21 |
+|---|---|:---:|:---:|
+| FP16* TP4 | Decode | 63.51 tok/s | 56.19 tok/s |
+|  | Exactness | ✓ | ✓ |
+|  | Correctness | ✓ | ✓ |
+| FP8 TP4 | Decode | 90.45 tok/s | 74.86 tok/s |
+|  | Exactness | ✗ | ✗ |
+|  | Correctness | ✓ | ✓ |
+| GPTQ-Int4 TP4 | Decode | 95.35 tok/s | 78.38 tok/s |
+|  | Exactness | ✗ | ✗ |
+|  | Correctness | ✓ | ✓ |
+
+_**Decode** = per-user tok/s at C1. **Exactness** ✓ = bit-identical run-to-run (temp 0). **Correctness** ✓ = coherent, usable output. So ✗ exactness / ✓ correctness = not bit-exact but coherent (e.g. FP8/MoE routing drift — expected, not an error); ✗ / ✗ = degenerate output (the GPTQ-Int4 27B case)._
 
 _\*BF16 checkpoint, served as FP16 on V100 (sm_70 has no native BF16; `--dtype float16`) — the decode/latency numbers are FP16 runtime._
 <!-- endrender -->
@@ -39,6 +48,8 @@ FP8 leads FP16 substantially at one user (and the gap *widens* under load — se
 |  | 0.21 | 14.22 s | 9.08 s | — |
 | FP8 TP4 | 0.19 | 55.65 s | — | — |
 |  | 0.21 | 56.68 s | 50.01 s | — |
+| GPTQ-Int4 TP4 | 0.19 | 16.96 s | — | — |
+|  | 0.21 | 16.60 s | — | — |
 
 All TTFT is single-stream, chunked-prefill **on** (the project-standard serve — disabling chunked prefill is a known V100 crash-causer). **Cold first-token** = a fresh, cache-cold request prefilling the full ~22.6k-token prompt (worst case); **Prefix-cache-hit** = the same prompt with its prefix already cached — repeated or shared context (best case). Cold TTFT is prefill-bound, and the Qwen **block-FP8** checkpoints carry a large prefill penalty on V100 (an unoptimized FP8-prefill path, worst on the MoE models) — a latency-side current-state limit, not where FP8's *decode* win lives; compressed-tensors FP8 (Gemma/GLM) and FP16/Int4 prefill cheaper.
 
@@ -57,10 +68,14 @@ This is the FP8 cost side and it is steep: the **block-FP8 MoE cold prefill is ~
 |  | Aggregate | 63.51 | 88.46 | 141.14 | 224.12 |
 | 0.19 FP8 TP4 | Per-user | 90.45 | 74.55 | 66.07 | 51.81 |
 |  | Aggregate | 90.45 | 149.11 | 264.30 | 414.49 |
+| 0.19 GPTQ-Int4 TP4 | Per-user | 95.35 | 75.58 | 68.31 | 62.36 |
+|  | Aggregate | 95.35 | 151.17 | 273.24 | 498.91 |
 | 0.21 FP16* TP4 | Per-user | 56.19 | 39.98 | 26.94 | 21.39 |
 |  | Aggregate | 56.19 | 79.95 | 107.74 | 171.14 |
 | 0.21 FP8 TP4 | Per-user | 74.86 | 63.38 | 58.77 | 45.80 |
 |  | Aggregate | 74.86 | 126.76 | 235.07 | 366.41 |
+| 0.21 GPTQ-Int4 TP4 | Per-user | 78.38 | 64.23 | 60.11 | 54.47 |
+|  | Aggregate | 78.38 | 128.45 | 240.44 | 435.75 |
 
 _\*BF16 checkpoint, served as FP16 on V100 (sm_70 has no native BF16; `--dtype float16`) — the decode/latency numbers are FP16 runtime._
 <!-- endrender -->

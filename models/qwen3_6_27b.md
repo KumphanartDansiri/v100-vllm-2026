@@ -23,10 +23,19 @@ TP. FP16 reclaims the 8-user aggregate (the dense CUDA-core-vs-tensor-core wall,
 *What one stream expects at C1 — decode throughput on each engine; this is the precision/TP choice for a solo user or small lab.*
 
 <!-- render:single_user:qwen3_6_27b -->
-| Choice | 0.19 C1 Decode | 0.21 C1 Decode |
-|---|---:|---:|
-| FP16* TP4 | 40.05 tok/s | 35.37 tok/s |
-| FP8 TP4 | 54.35 tok/s | 46.13 tok/s |
+| Choice | Type | 0.19 | 0.21 |
+|---|---|:---:|:---:|
+| FP16* TP4 | Decode | 40.05 tok/s | 35.37 tok/s |
+|  | Exactness | ✓ | ✓ |
+|  | Correctness | ✓ | ✓ |
+| FP8 TP4 | Decode | 54.35 tok/s | 46.13 tok/s |
+|  | Exactness | ✓ | ✓ |
+|  | Correctness | ✓ | ✓ |
+| FP8 TP2 | Decode | 35.13 tok/s | 31.69 tok/s |
+|  | Exactness | ✓ | ✓ |
+|  | Correctness | ✓ | ✓ |
+
+_**Decode** = per-user tok/s at C1. **Exactness** ✓ = bit-identical run-to-run (temp 0). **Correctness** ✓ = coherent, usable output. So ✗ exactness / ✓ correctness = not bit-exact but coherent (e.g. FP8/MoE routing drift — expected, not an error); ✗ / ✗ = degenerate output (the GPTQ-Int4 27B case)._
 
 _\*BF16 checkpoint, served as FP16 on V100 (sm_70 has no native BF16; `--dtype float16`) — the decode/latency numbers are FP16 runtime._
 <!-- endrender -->
@@ -44,6 +53,8 @@ Same-card (TP4) **FP8 beats FP16** (54 vs 40 on 0.19); the **half-GPU FP8 TP2** 
 |  | 0.21 | 27.182 s | 11.97 s | 1.776 s |
 | FP8 TP4 | 0.19 | 35.931 s | — | 2.165 s |
 |  | 0.21 | 33.431 s | — | 2.013 s |
+| FP8 TP2 | 0.19 | 69.674 s | — | 3.692 s |
+|  | 0.21 | 63.673 s | 30.88 s | 3.319 s |
 
 All TTFT is single-stream, chunked-prefill **on** (the project-standard serve — disabling chunked prefill is a known V100 crash-causer). **Cold first-token** = a fresh, cache-cold request prefilling the full ~22.6k-token prompt (worst case); **Prefix-cache-hit** = the same prompt with its prefix already cached — repeated or shared context (best case). Cold TTFT is prefill-bound, and the Qwen **block-FP8** checkpoints carry a large prefill penalty on V100 (an unoptimized FP8-prefill path, worst on the MoE models) — a latency-side current-state limit, not where FP8's *decode* win lives; compressed-tensors FP8 (Gemma/GLM) and FP16/Int4 prefill cheaper.
 
