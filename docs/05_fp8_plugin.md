@@ -24,8 +24,8 @@ these deltas are **engine-invariant** and hold on 0.19 too):
 | GLM-4.5-Air-FP8 | 57.8 | 65.2 |
 
 Against the **first-published** baselines (122B 34.6, GLM-Air 30.8), the model-level progress is
-**1.65×** and **2.12×** — but those baselines were measured on the older engine, so that span bundles
-the 0.18→0.21 engine move in with the kernel work; read it as *product progress*, not a single-kernel
+**1.65×** and **2.12×** — but those baselines were measured on an older engine, so that span bundles
+the engine move in with the kernel work; read it as *product progress*, not a single-kernel
 attribution. The clean kernel attribution, all on 0.21: the branchless converter alone is most of the
 lift (e.g. 122B's first 0.21 coalesced reading was 44.3 with the slow converter → 57.0 with the fast
 one, ~1.29×), and coalesced layout adds the rest (51.8→57.0, ~1.10×).
@@ -63,45 +63,98 @@ concurrency range on large MoE** — and these models are practical on 8×V100 o
   **tensor-core / WMMA FP8 decode kernel** (the prefill path already runs WMMA) — a current result, not
   a permanent ceiling.
 
-## The Qwen3.5 exact pair: precision × TP (the controlled comparison)
+## The Qwen3.5 pair: precision comparison at the fleet condition
 
 The flagship evidence above is large-MoE. The cleanest *controlled* test is two exact Qwen3.5
 checkpoints — one dense (**27B**), one MoE (**35B-A3B**) — each as official **FP16**, our **FP8
-W8A16**, and **GPTQ-Int4**, at full **TP4** and half **TP2**. Per-user decode tok/s (vLLM 0.21,
-4096 ctx, 512 tok, temp 0):
+W8A16**, and **GPTQ-Int4**, measured at the **fleet condition** (32768 ctx, 256-tok median-of-5,
+chunked-prefill on, TP4) — the same setup as every flagship. Per-user decode tok/s on vLLM 0.21 (the
+dual-engine 0.19+0.21 view is the triad table below):
 
-**Dense — Qwen3.5-27B** (TP4, per-user tok/s)
+**Dense — Qwen3.5-27B** (fleet, per-user tok/s)
 | Users | FP16 | FP8 W8A16 | GPTQ-Int4 |
 |---:|---:|---:|---:|
-| 1 | 39.1 | **52.5** | 69.2 |
-| 2 | 31.1 | **42.5** | 55.5 |
-| 4 | 30.3 | 31.7 | 47.4 |
-| 8 | 29.3 | 20.3 | 44.2 |
+| 1 | 35.4 | **46.0** | 50.4 |
+| 2 | 28.5 | **37.1** | 41.3 |
+| 4 | 27.7 | **28.4** | 38.8 |
+| 8 | 27.4 | 19.4 | 34.9 |
 
-**MoE — Qwen3.5-35B-A3B** (TP4, per-user tok/s)
+**MoE — Qwen3.5-35B-A3B** (fleet, per-user tok/s)
 | Users | FP16 | FP8 W8A16 | GPTQ-Int4 |
 |---:|---:|---:|---:|
-| 1 | 66.2 | **92.9** | 126.2 |
-| 2 | 45.4 | **77.6** | 96.1 |
-| 4 | 29.5 | **72.4** | 76.2 |
-| 8 | 22.9 | **54.9** | 75.1 |
+| 1 | 56.2 | **74.9** | 78.4 |
+| 2 | 40.0 | **63.4** | 64.2 |
+| 4 | 26.9 | **58.8** | 60.1 |
+| 8 | 21.4 | **45.8** | 54.5 |
 
-Dense reproduces the crossover (FP8 **1.34×** FP16 at C1, parity at C4, **0.69×** at C8 — the
+Dense reproduces the crossover (FP8 **1.30×** FP16 at C1, ~parity at C4, **0.71×** at C8 — the
 CUDA-core wall above); MoE-FP8 wins at *every* concurrency and the margin **grows with load
-(1.40× → 2.45×)**. Int4 is fastest raw but lossy. (FP8 cells in **bold** where they beat FP16.)
+(1.33× → 2.14×)**. (FP8 cells in **bold** where they beat FP16.)
 
-**Capacity — the half-TP result.** At TP2 (2×32 GB) **both FP16 checkpoints fall out of the serving
+> **GPTQ-Int4 correctness — read before using the Int4 columns.** Int4 is fastest raw, but on V100 its
+> *output quality splits by model*: **MoE** Int4 (35B here, and the 122B) is coherent, but the **dense
+> 27B** Int4 emits **degenerate repetition** — the correctness battery hard-**fails** it on both engines.
+> That is a known, **upstream** GPTQ-on-Volta issue (the hybrid model's layers quantize badly), **not**
+> the serving stack. So the **27B-Int4 numbers are a speed-only datapoint — do not deploy it**; its
+> tok/s are reported only for completeness.
+
+**Capacity — the half-TP result (a 4096-ctx capacity sub-study; the fleet runs TP4).** At TP2 (2×32 GB)
+**both FP16 checkpoints fall out of the serving
 envelope** while FP8 and Int4 fit (C1 tok/s):
 
 | Model | FP16 @TP2 | FP8 @TP2 | Int4 @TP2 |
 |---|---|---:|---:|
-| 27B dense | **OOM** (no KV room) | 34.0 | 43.3 |
-| 35B-A3B MoE | **OOM** (weights >32 GB) | 82.2 | 99.0 |
+| 27B dense | **OOM** (no KV room) | 34.0 | 38.9 |
+| 35B-A3B MoE | **OOM** (weights >32 GB) | 82.2 | 82.4 |
 
 The two OOMs differ: 35B-A3B FP16 is a **hard weight-OOM** (~33 GB/GPU before any KV); 27B FP16 is a
 **KV-room OOM** (weights load, the standard envelope leaves no KV headroom). Either way, **FP8 is the
 faithful format that puts a modern MoE on half the GPUs** — FP16 cannot. Full per-concurrency TP2
 tables: the [27B](../models/qwen3_5_27b.md) and [35B-A3B](../models/qwen3_5_35b_a3b.md) model pages.
+
+## Triad performance comparison — both engines (the dual-engine promotion)
+
+Both featured checkpoints are now **fully tested across both freeze-high engines**: every precision —
+FP16, FP8 W8A16, GPTQ-Int4 — measured on **vLLM 0.19+cu126 *and* 0.21+cu126** at the same fleet serve
+(TP4 / 32768-ctx / 256-tok median-5 / chunked-on / cudagraph), so the engine is the only variable. These
+tables render straight from the SSOT (per-user decode tok/s, C1→C8; **27B-Int4 is the degenerate-output
+GPTQ case noted above — speed-only**):
+
+**Dense — Qwen3.5-27B**
+<!-- render:triad:qwen3_5_27b -->
+| Precision | Engine | C1 | C2 | C4 | C8 |
+|---|---|---:|---:|---:|---:|
+| FP16* | 0.19 | 40.04 | 31.52 | 30.97 | 30.26 |
+|  | 0.21 | 35.43 | 28.46 | 27.72 | 27.40 |
+| FP8 | 0.19 | 54.05 | 42.83 | 30.83 | 20.43 |
+|  | 0.21 | 46.05 | 37.06 | 28.41 | 19.44 |
+| GPTQ-Int4 | 0.19 | 60.47 | 48.12 | 44.92 | 40.19 |
+|  | 0.21 | 50.36 | 41.25 | 38.82 | 34.90 |
+
+_\*BF16 checkpoint, served as FP16 on V100 (sm_70 has no native BF16; `--dtype float16`) — the decode/latency numbers are FP16 runtime._
+<!-- endrender -->
+
+**MoE — Qwen3.5-35B-A3B**
+<!-- render:triad:qwen3_5_35b_a3b -->
+| Precision | Engine | C1 | C2 | C4 | C8 |
+|---|---|---:|---:|---:|---:|
+| FP16* | 0.19 | 63.51 | 44.23 | 35.28 | 28.02 |
+|  | 0.21 | 56.19 | 39.98 | 26.94 | 21.39 |
+| FP8 | 0.19 | 90.45 | 74.55 | 66.07 | 51.81 |
+|  | 0.21 | 74.86 | 63.38 | 58.77 | 45.80 |
+| GPTQ-Int4 | 0.19 | 95.35 | 75.58 | 68.31 | 62.36 |
+|  | 0.21 | 78.38 | 64.23 | 60.11 | 54.47 |
+
+_\*BF16 checkpoint, served as FP16 on V100 (sm_70 has no native BF16; `--dtype float16`) — the decode/latency numbers are FP16 runtime._
+<!-- endrender -->
+
+Two things hold across the whole triad. **(1) The precision ordering is engine-invariant** — Int4 (raw
+speed) > FP8 > FP16, FP8's dense crossover, MoE-FP8 winning at every concurrency, the TP2 capacity
+result: none of it depends on the engine, so the *precision* guidance is the same whichever engine you
+run (the 27B-Int4 *correctness* failure is also engine-invariant — garbage on both). **(2) 0.19 is
+uniformly faster than 0.21** — ~13–22% across every cell, the documented engine regression — so 0.19 is
+the throughput pick and 0.21 the keep-it-patchable-foundation pick (see
+[Chapter 1](01_v100_in_2026.md)).
 
 ## Prefill cost (TTFT) — the honest tradeoff
 
@@ -109,8 +162,8 @@ Decode and capacity favor FP8; prefill does not. Cold first-token, C1, TP4, long
 
 | Model | FP16 | FP8 | FP8 + FA-V100 |
 |---|---:|---:|---:|
-| 27B dense | 27.0 s | 32.2 s | 17.4 s |
-| 35B-A3B MoE | 14.2 s | 55.1 s | 49.9 s |
+| 27B dense | 27.0 s | 32.2 s | 16.7 s |
+| 35B-A3B MoE | 14.2 s | 56.7 s | 50.0 s |
 
 FP8 prefill is slower than FP16 — modest on dense (~1.2×), **steep on the MoE** (55 vs 14 s) —
 because the block-FP8 MoE prefill runs an unoptimized Volta WMMA dequant path. The **FA-V100 bridge**
@@ -118,42 +171,35 @@ roughly halves the *dense* prefill (attention-bound) but barely moves the **MoE-
 is FP8 compute, not attention). So FP8 is for decode-heavy / capacity-bound serving; long-context,
 short-output traffic (RAG, summarize) prefills cheaper on FP16 or Int4.
 
-> **Config note.** TTFT is measured **chunked-prefill on** (`enable_chunked_prefill=True`, the
-> deployment standard). The decode tok/s tables above come from a steady-state sweep harness run with
-> chunked-prefill *off* — which does not change steady-state decode throughput (it only affects prefill
-> scheduling). Both are otherwise the standard V100 serve (`mode=0 + FULL_DECODE_ONLY` cudagraph,
-> TRITON_ATTN, ns=8). Disabling chunked prefill is only a crash risk on large hybrid configs at long
-> context (e.g. 122B @ 28k); these 4096-ctx runs are safe.
+> **Config note.** Decode tok/s, TTFT, and the correctness battery all come from the **same fleet
+> serve**: 32768 ctx, **chunked-prefill on** (`enable_chunked_prefill=True`, the deployment standard),
+> `mode=0 + FULL_DECODE_ONLY` cudagraph, TRITON_ATTN, ns=8 — decode is 256-tok median-of-5; cold TTFT is
+> a fresh ~22.6k-token prefill. Chunked prefill is the standard serve; disabling it is a known V100
+> crash-causer on large hybrid configs at long context (e.g. 122B @ 28k).
 
 ## Faithfulness
 
-Temperature 0, the reliability harness:
+From the fleet correctness battery (temperature 0):
+- **FP16 and FP8 are coherent** on both checkpoints — the battery passes 4/5, the lone "suspect" being a
+  strict JSON-format gate, not an error. FP16 decode is bit-deterministic run-to-run; **FP8 is Stable** —
+  coherent and token-divergent vs FP16 (different numerics, not errors). Byte-identity is the wrong bar
+  for an FP8-vs-FP16 pair; coherent-equivalent is, and FP8 clears it.
+- **GPTQ-Int4 splits by model:** coherent on the 35B MoE (and the 122B), but **degenerate on the dense
+  27B** (pure repetition, a hard battery fail on both engines) — a known upstream GPTQ-on-Volta defect,
+  not the serving stack. Treat 27B-Int4 as speed-only.
 
-- **Self-stability:** all four exact-pair cells are **Exact** — bit-deterministic across 5 runs,
-  *including the MoE-FP8* (the 3.6-35B-A3B-FP8 was only "Stable"; this 3.5 checkpoint is tighter).
-- **FP8 vs FP16:** **Stable, not Exact** — both coherent, but greedy tokens diverge (different
-  numerics, not errors). That is the correct grade for any FP8-vs-FP16 pair: byte-identity is the
-  wrong bar, coherent-equivalent is, and FP8 clears it.
+## 3.5 ≈ 3.6 — same architecture, same condition
 
-## 3.5 vs 3.6 — the deep-dive generalizes
-
-Qwen3.6 is the same architecture/config as 3.5, so the exact-pair findings should carry to the broad
-3.6 baseline matrix. They do — FP8 long-input TTFT, matched at TP4:
-
-| FP8 long-TTFT @ TP4 | 3.5 | 3.6 |
-|---|---:|---:|
-| 27B | 32.2 s | 32.2 s |
-| 35B-A3B | 55.1 s | 53.3 s |
-
-Essentially identical — supporting the "3.5 deep-dive, 3.6 wide baseline" split. (An earlier 62 s for
-3.6-27B was a TP2 artifact; a 14-vs-72 s contamination on 3.6-35B resolved to a clean 53 s.)
+Qwen3.5 and 3.6 share architecture/config, and now that both are measured at the identical fleet
+condition their numbers track closely (e.g. FP8 cold TTFT @ TP4: 27B ≈ 32 s on both; 35B-A3B ≈ 56 vs
+53 s). The 3.5 pair is the featured worked example; the 3.6 pair is the broad baseline — the findings
+are interchangeable.
 
 ## FP8 vs Int4 (122B, engine-matched on vLLM 0.21)
 Where both formats exist they are **peers** — on the matched 0.21 stack they trade the lead through
 mid-concurrency: per-user **58/57** (C1, Int4 +3%), **46/46** (C2, a tie), **42/41** (C4, FP8 nudges
-ahead), and Int4 pulls clear only at **C8 (+~20%, 37 vs 31)**. A naive comparison that ran Int4 on
-vLLM 0.18 and FP8 on 0.21 inflated Int4 by ~85% of the apparent gap — engine *version*, not format; on
-the matched stack the lead all but disappears below C8. FP8 is the **broader fleet** path: GLM-Air and the Gemma FP8 checkpoints have
+ahead), and Int4 pulls clear only at **C8 (+~20%, 37 vs 31)** — the lead all but disappears below C8
+once both formats are measured on the same engine. FP8 is the **broader fleet** path: GLM-Air and the Gemma FP8 checkpoints have
 **no GPTQ-Int4 equivalent**, e4m3 is numerically richer than int4, and MTP runs on FP8 but crashes
 on gptq-int4 122B. Int4 is the right pick where a GPTQ checkpoint exists *and* C8 aggregate
 throughput is the sole objective.

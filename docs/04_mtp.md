@@ -37,11 +37,13 @@ depends on the model and precision.** Two reads off the sweep:
 |  | 2 | 70.08 | 86.77 | 1.24x | 71.3% | Diff |
 |  | 3 | 70.11 | 79.98 | 1.14x | 58.1% | Diff |
 |  | 4 | 70.11 | 77.48 | 1.11x | 47.0% | Diff |
-| Qwen3.6-35B-A3B (FP16, MoE) | 1 | 15.86 | 17.2 | 1.08x | 84.9% | Diff |
+| Qwen3.6-35B-A3B (FP16*, MoE) | 1 | 15.86 | 17.2 | 1.08x | 84.9% | Diff |
 | Qwen3.5-122B-A10B (FP8, MoE) | 1 | 45.86 | 48.2 | 1.05x | 87.4% | Diff |
 |  | 2 | 45.70 | 66.09 | 1.45x | 77.8% | Diff |
 |  | 3 | 45.82 | 74.53 | 1.63x | 67.2% | Diff |
 |  | 4 | 45.85 | 76.78 | 1.67x | 56.9% | Diff |
+
+_\*BF16 checkpoint, served as FP16 on V100 (sm_70 has no native BF16; `--dtype float16`) — the decode/latency numbers are FP16 runtime._
 <!-- endrender -->
 
 This is the **measured** sweep, not an exhaustive grid: k≥2 was run where it mattered (the FP8 MoE and

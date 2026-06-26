@@ -56,6 +56,14 @@ two numbers — most "V100 is slow" claims online compare incomparable things.
   MTP numbers are kept in their own chapter and never mixed into base-decode comparisons.
 
 ## Precision / config
+- **BF16 vs FP16 labelling convention:** the full-precision checkpoints (Qwen, Gemma, GLM) all ship
+  in **BF16**, but V100 (sm_70) has no usable BF16 path, so they are served `--dtype float16`
+  (bf16→fp16 cast). We label by **what the table shows**: model-**identity** tables (the "models
+  tested" / official-checkpoint listing) say **BF16** (the source dtype you download); any table with
+  a **performance** number (decode tok/s, TTFT, scaling) says **FP16\*** — the asterisk links to a
+  per-table footnote (*BF16 checkpoint, served as FP16 on V100*). So the same checkpoint legitimately
+  reads BF16 in the identity table and FP16\* in the results tables — that is the cast, not an
+  inconsistency. Quantized variants (FP8, GPTQ-Int4) carry their own native dtype in both.
 - **fp16 / bf16:** full-precision weights (the reference). For MoE models on V100, see the
   `config` column — `stock(pre-moe-patch)` is the un-tuned vLLM default (pathologically slow,
   Chapter 2); `+moe_patch` is with our Volta fused-MoE fix.

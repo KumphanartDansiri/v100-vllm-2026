@@ -76,12 +76,12 @@ renderer/prose is fixed.*
 <!-- render:model:GLM-4.5-Air -->
 | vLLM | Variant | TP | Users | Config | Per-user | Aggregate | Cold TTFT | FA Cold | Prefix Hit | Result path |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 0.21.0/cu126 | fp8 | TP8 | 1 | fp8-plugin+coalesced | 65.45 | 65.45 | 66.942 | 49.35 | 0.752 | results/perf_v2_glm_fp8_021_20260620_194734 |
-| 0.21.0/cu126 | fp8 | TP8 | 2 | fp8-plugin+coalesced | 51.69 | 103.38 | - | - | - | results/perf_v2_glm_fp8_021_20260620_194734 |
-| 0.21.0/cu126 | fp8 | TP8 | 4 | fp8-plugin+coalesced | 38.0 | 152.0 | - | - | - | results/perf_v2_glm_fp8_021_20260620_194734 |
-| 0.21.0/cu126 | fp8 | TP8 | 8 | fp8-plugin+coalesced | 26.0 | 208.0 | - | - | - | results/perf_v2_glm_fp8_021_20260620_194734 |
-| 0.19.0/cu126 | fp8 | TP8 | 1 | fp8-plugin+coalesced | 64.67 | 64.67 | 68.788 | - | 0.737 | results/perf_v2_glm_fp8_019_20260620_220710 |
-| 0.19.0/cu126 | fp8 | TP8 | 2 | fp8-plugin+coalesced | 50.63 | 101.26 | - | - | - | results/perf_v2_glm_fp8_019_20260620_220710 |
-| 0.19.0/cu126 | fp8 | TP8 | 4 | fp8-plugin+coalesced | 38.06 | 152.24 | - | - | - | results/perf_v2_glm_fp8_019_20260620_220710 |
-| 0.19.0/cu126 | fp8 | TP8 | 8 | fp8-plugin+coalesced | 25.97 | 207.79 | - | - | - | results/perf_v2_glm_fp8_019_20260620_220710 |
+| 0.21.0/cu126 | FP8 | TP8 | 1 | fp8-plugin+coalesced | 65.45 | 65.45 | 66.942 | 49.35 | 0.752 | results/perf_v2_glm_fp8_021_20260620_194734 |
+| 0.21.0/cu126 | FP8 | TP8 | 2 | fp8-plugin+coalesced | 51.69 | 103.38 | - | - | - | results/perf_v2_glm_fp8_021_20260620_194734 |
+| 0.21.0/cu126 | FP8 | TP8 | 4 | fp8-plugin+coalesced | 38.0 | 152.0 | - | - | - | results/perf_v2_glm_fp8_021_20260620_194734 |
+| 0.21.0/cu126 | FP8 | TP8 | 8 | fp8-plugin+coalesced | 26.0 | 208.0 | - | - | - | results/perf_v2_glm_fp8_021_20260620_194734 |
+| 0.19.0/cu126 | FP8 | TP8 | 1 | fp8-plugin+coalesced | 64.67 | 64.67 | 68.788 | - | 0.737 | results/perf_v2_glm_fp8_019_20260620_220710 |
+| 0.19.0/cu126 | FP8 | TP8 | 2 | fp8-plugin+coalesced | 50.63 | 101.26 | - | - | - | results/perf_v2_glm_fp8_019_20260620_220710 |
+| 0.19.0/cu126 | FP8 | TP8 | 4 | fp8-plugin+coalesced | 38.06 | 152.24 | - | - | - | results/perf_v2_glm_fp8_019_20260620_220710 |
+| 0.19.0/cu126 | FP8 | TP8 | 8 | fp8-plugin+coalesced | 25.97 | 207.79 | - | - | - | results/perf_v2_glm_fp8_019_20260620_220710 |
 <!-- endrender -->

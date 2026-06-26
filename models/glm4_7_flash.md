@@ -34,7 +34,9 @@ FlashAttention MLA *prefill* backend. Three env-gated patches unblock it (decode
 <!-- render:single_user:glm4_7_flash -->
 | Choice | 0.19 C1 Decode | 0.21 C1 Decode |
 |---|---:|---:|
-| BF16 TP4 | 35.36 tok/s | 30.97 tok/s |
+| FP16* TP4 | 35.36 tok/s | 30.97 tok/s |
+
+_\*BF16 checkpoint, served as FP16 on V100 (sm_70 has no native BF16; `--dtype float16`) — the decode/latency numbers are FP16 runtime._
 <!-- endrender -->
 
 ~31 (0.21) / ~35 (0.19) tok/s — comfortably usable, on the first MLA model to run on V100 at all. Its
@@ -48,10 +50,12 @@ box throughput.*
 <!-- render:concurrency:glm4_7_flash -->
 | Config | Type | C1 | C2 | C4 | C8 |
 |---|---|---:|---:|---:|---:|
-| 0.19 BF16 TP4 | Per-user | 35.36 | 27.62 | 21.37 | 17.5 |
+| 0.19 FP16* TP4 | Per-user | 35.36 | 27.62 | 21.37 | 17.5 |
 |  | Aggregate | 35.36 | 55.24 | 85.48 | 140.01 |
-| 0.21 BF16 TP4 | Per-user | 30.97 | 21.17 | 13.25 | 10.35 |
+| 0.21 FP16* TP4 | Per-user | 30.97 | 21.17 | 13.25 | 10.35 |
 |  | Aggregate | 30.97 | 42.34 | 53.0 | 82.78 |
+
+_\*BF16 checkpoint, served as FP16 on V100 (sm_70 has no native BF16; `--dtype float16`) — the decode/latency numbers are FP16 runtime._
 <!-- endrender -->
 
 Scales modestly (MLA decode + an untuned MoE shape); **0.19 scales notably better** (aggregate 140 vs
@@ -66,10 +70,12 @@ is done; the prefill/TTFT chapter (autotune that MoE JSON) is future work.
 <!-- render:ttft:glm4_7_flash -->
 | Choice | Engine | Cold First Token | Prefix-cache Hit |
 |---|---|---:|---:|
-| BF16 TP4 | 0.19 | 212.489 s | 0.452 s |
+| FP16* TP4 | 0.19 | 212.489 s | 0.452 s |
 |  | 0.21 | 143.993 s | 0.454 s |
 
 All TTFT is single-stream, chunked-prefill **on** (the project-standard serve — disabling chunked prefill is a known V100 crash-causer). **Cold first-token** = a fresh, cache-cold request prefilling the full ~22.6k-token prompt (worst case); **Prefix-cache-hit** = the same prompt with its prefix already cached — repeated or shared context (best case). Cold TTFT is prefill-bound, and the Qwen **block-FP8** checkpoints carry a large prefill penalty on V100 (an unoptimized FP8-prefill path, worst on the MoE models) — a latency-side current-state limit, not where FP8's *decode* win lives; compressed-tensors FP8 (Gemma/GLM) and FP16/Int4 prefill cheaper.
+
+_\*BF16 checkpoint, served as FP16 on V100 (sm_70 has no native BF16; `--dtype float16`) — the decode/latency numbers are FP16 runtime._
 <!-- endrender -->
 
 Prefix-cache-hit (repeated/shared prefix) is sub-second — the cold number is the worst case, paid once
@@ -91,12 +97,14 @@ renderer/prose is fixed.*
 <!-- render:model:GLM-4.7-Flash -->
 | vLLM | Variant | TP | Users | Config | Per-user | Aggregate | Cold TTFT | FA Cold | Prefix Hit | Result path |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 0.21.0/cu126 | bf16 | TP4 | 1 | fp16mla+cudagraph | 30.97 | 30.97 | 143.993 | - | 0.454 | results/perf_v2_glm47_fp16_021_20260621_172718 |
-| 0.21.0/cu126 | bf16 | TP4 | 2 | fp16mla+cudagraph | 21.17 | 42.34 | - | - | - | results/perf_v2_glm47_fp16_021_20260621_172718 |
-| 0.21.0/cu126 | bf16 | TP4 | 4 | fp16mla+cudagraph | 13.25 | 53.0 | - | - | - | results/perf_v2_glm47_fp16_021_20260621_172718 |
-| 0.21.0/cu126 | bf16 | TP4 | 8 | fp16mla+cudagraph | 10.35 | 82.78 | - | - | - | results/perf_v2_glm47_fp16_021_20260621_172718 |
-| 0.19.0/cu128 | bf16 | TP4 | 1 | fp16mla+cudagraph | 35.36 | 35.36 | 212.489 | - | 0.452 | results/perf_v2_glm47_fp16_019_20260622_001738 |
-| 0.19.0/cu128 | bf16 | TP4 | 2 | fp16mla+cudagraph | 27.62 | 55.24 | - | - | - | results/perf_v2_glm47_fp16_019_20260622_001738 |
-| 0.19.0/cu128 | bf16 | TP4 | 4 | fp16mla+cudagraph | 21.37 | 85.48 | - | - | - | results/perf_v2_glm47_fp16_019_20260622_001738 |
-| 0.19.0/cu128 | bf16 | TP4 | 8 | fp16mla+cudagraph | 17.5 | 140.01 | - | - | - | results/perf_v2_glm47_fp16_019_20260622_001738 |
+| 0.21.0/cu126 | FP16* | TP4 | 1 | fp16mla+cudagraph | 30.97 | 30.97 | 143.993 | - | 0.454 | results/perf_v2_glm47_fp16_021_20260621_172718 |
+| 0.21.0/cu126 | FP16* | TP4 | 2 | fp16mla+cudagraph | 21.17 | 42.34 | - | - | - | results/perf_v2_glm47_fp16_021_20260621_172718 |
+| 0.21.0/cu126 | FP16* | TP4 | 4 | fp16mla+cudagraph | 13.25 | 53.0 | - | - | - | results/perf_v2_glm47_fp16_021_20260621_172718 |
+| 0.21.0/cu126 | FP16* | TP4 | 8 | fp16mla+cudagraph | 10.35 | 82.78 | - | - | - | results/perf_v2_glm47_fp16_021_20260621_172718 |
+| 0.19.0/cu128 | FP16* | TP4 | 1 | fp16mla+cudagraph | 35.36 | 35.36 | 212.489 | - | 0.452 | results/perf_v2_glm47_fp16_019_20260622_001738 |
+| 0.19.0/cu128 | FP16* | TP4 | 2 | fp16mla+cudagraph | 27.62 | 55.24 | - | - | - | results/perf_v2_glm47_fp16_019_20260622_001738 |
+| 0.19.0/cu128 | FP16* | TP4 | 4 | fp16mla+cudagraph | 21.37 | 85.48 | - | - | - | results/perf_v2_glm47_fp16_019_20260622_001738 |
+| 0.19.0/cu128 | FP16* | TP4 | 8 | fp16mla+cudagraph | 17.5 | 140.01 | - | - | - | results/perf_v2_glm47_fp16_019_20260622_001738 |
+
+_\*BF16 checkpoint, served as FP16 on V100 (sm_70 has no native BF16; `--dtype float16`) — the decode/latency numbers are FP16 runtime._
 <!-- endrender -->

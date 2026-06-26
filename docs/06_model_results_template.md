@@ -26,13 +26,13 @@ or limitation (footnoted). Under **MoE patch**, ✓ = required for usable FP16-M
 | Official model / checkpoint | 0.19<br>stock | 0.19<br>+ tf5 | 0.21<br>stock¹ | MoE<br>patch | FP8<br>plugin |
 |---|:--:|:--:|:--:|:--:|:--:|
 | **Qwen3.5-27B family** (featured) |  |  |  |  |  |
-| `Qwen/Qwen3.5-27B` | ✓⁵ | — | ✓ | — | — |
-| `Qwen/Qwen3.5-27B-FP8` | ✓⁵ | — | ✓ | — | ✓ |
-| `Qwen/Qwen3.5-27B-GPTQ-Int4` | ✓⁵ | — | ✓ | — | — |
+| `Qwen/Qwen3.5-27B` | ✓ | — | ✓ | — | — |
+| `Qwen/Qwen3.5-27B-FP8` | ✓ | — | ✓ | — | ✓ |
+| `Qwen/Qwen3.5-27B-GPTQ-Int4` | ✓ | — | ✓ | — | — |
 | **Qwen3.5-35B-A3B family** (featured) |  |  |  |  |  |
-| `Qwen/Qwen3.5-35B-A3B` | ✓⁵ | — | ✓ | ✓ | — |
-| `Qwen/Qwen3.5-35B-A3B-FP8` | ✓⁵ | — | ✓ | — | ✓ |
-| `Qwen/Qwen3.5-35B-A3B-GPTQ-Int4` | ✓⁵ | — | ✓ | — | — |
+| `Qwen/Qwen3.5-35B-A3B` | ✓ | — | ✓ | ✓ | — |
+| `Qwen/Qwen3.5-35B-A3B-FP8` | ✓ | — | ✓ | — | ✓ |
+| `Qwen/Qwen3.5-35B-A3B-GPTQ-Int4` | ✓ | — | ✓ | — | — |
 | **Qwen3.6-27B family** |  |  |  |  |  |
 | `Qwen/Qwen3.6-27B` | ✓ | — | ✓ | — | — |
 | `Qwen/Qwen3.6-27B-FP8` | ✓ | — | ✓ | — | ✓ |
@@ -61,9 +61,6 @@ FP16 runs on both.
 headline FP8 win is the routed-expert kernels, not the patch.
 ⁴ MLA models load on stock Volta but **crash on the first token** (Ampere-only MLA prefill); the
 env-gated MLA patches (local, sm_70) unblock it on either engine. Decode rides stock TritonMLA.
-⁵ The featured **Qwen3.5** pair was benchmarked on **0.21** (FP16/FP8) and stock **0.18** (GPTQ-Int4);
-the **0.19** mark is by model-class equivalence with the architecturally-identical **Qwen3.6** family
-(which passes on 0.19), not a separate Qwen3.5 run.
 
 ## Family pages
 - [**Qwen3.5-27B**](../models/qwen3_5_27b.md) — **featured** dense pair; FP8 beats FP16 to ~C4, FP16 reclaims C8. Full precision×TP / TTFT / faithfulness profile in [Ch.5](05_fp8_plugin.md).

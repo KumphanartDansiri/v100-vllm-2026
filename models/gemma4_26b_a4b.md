@@ -27,9 +27,11 @@ on 0.19). Where it runs, FP8 beats FP16 at every concurrency.
 <!-- render:single_user:gemma4_26b_a4b -->
 | Choice | 0.19 C1 Decode | 0.21 C1 Decode |
 |---|---:|---:|
-| FP16 TP4 | 39.47 tok/s | 44.39 tok/s |
+| FP16* TP4 | 39.47 tok/s | 44.39 tok/s |
 | FP8 TP4 | — | 72.85 tok/s |
 | FP8 TP2 | — | 60.15 tok/s |
+
+_\*BF16 checkpoint, served as FP16 on V100 (sm_70 has no native BF16; `--dtype float16`) — the decode/latency numbers are FP16 runtime._
 <!-- endrender -->
 
 On 0.21, **FP8 ≫ FP16** (72.9 vs 44.4); the half-GPU **FP8 TP2** (60 tok/s) fits on 2 cards.
@@ -40,11 +42,13 @@ On 0.21, **FP8 ≫ FP16** (72.9 vs 44.4); the half-GPU **FP8 TP2** (60 tok/s) fi
 <!-- render:ttft:gemma4_26b_a4b -->
 | Choice | Engine | Cold First Token | Prefix-cache Hit |
 |---|---|---:|---:|
-| FP16 TP4 | 0.19 | 56.932 s | 0.872 s |
+| FP16* TP4 | 0.19 | 56.932 s | 0.872 s |
 |  | 0.21 | 53.751 s | 0.851 s |
 | FP8 TP4 | 0.21 | 50.826 s | 0.980 s |
 
 All TTFT is single-stream, chunked-prefill **on** (the project-standard serve — disabling chunked prefill is a known V100 crash-causer). **Cold first-token** = a fresh, cache-cold request prefilling the full ~22.6k-token prompt (worst case); **Prefix-cache-hit** = the same prompt with its prefix already cached — repeated or shared context (best case). Cold TTFT is prefill-bound, and the Qwen **block-FP8** checkpoints carry a large prefill penalty on V100 (an unoptimized FP8-prefill path, worst on the MoE models) — a latency-side current-state limit, not where FP8's *decode* win lives; compressed-tensors FP8 (Gemma/GLM) and FP16/Int4 prefill cheaper.
+
+_\*BF16 checkpoint, served as FP16 on V100 (sm_70 has no native BF16; `--dtype float16`) — the decode/latency numbers are FP16 runtime._
 <!-- endrender -->
 
 ## Concurrency shape
@@ -54,12 +58,14 @@ All TTFT is single-stream, chunked-prefill **on** (the project-standard serve �
 <!-- render:concurrency:gemma4_26b_a4b -->
 | Config | Type | C1 | C2 | C4 | C8 |
 |---|---|---:|---:|---:|---:|
-| 0.19 FP16 TP4 | Per-user | 39.47 | 32.98 | 28.35 | 20.41 |
+| 0.19 FP16* TP4 | Per-user | 39.47 | 32.98 | 28.35 | 20.41 |
 |  | Aggregate | 39.47 | 65.96 | 113.4 | 163.26 |
-| 0.21 FP16 TP4 | Per-user | 44.39 | 35.53 | 23.16 | 21.61 |
+| 0.21 FP16* TP4 | Per-user | 44.39 | 35.53 | 23.16 | 21.61 |
 |  | Aggregate | 44.39 | 71.06 | 92.64 | 172.86 |
 | 0.21 FP8 TP4 | Per-user | 72.85 | 59.26 | 48.4 | 33.51 |
 |  | Aggregate | 72.85 | 118.52 | 193.6 | 268.05 |
+
+_\*BF16 checkpoint, served as FP16 on V100 (sm_70 has no native BF16; `--dtype float16`) — the decode/latency numbers are FP16 runtime._
 <!-- endrender -->
 
 **FP8 wins every concurrency** (C8 aggregate 268 vs 173) — the sparse-MoE arch-fit win. (FP8 is shown
@@ -78,28 +84,30 @@ renderer/prose is fixed.*
 <!-- render:model:gemma-4-26B-A4B-it -->
 | vLLM | Variant | TP | Users | Config | Per-user | Aggregate | Cold TTFT | FA Cold | Prefix Hit | Result path |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 0.21.0/cu126 | fp16 | TP4 | 1 | stock(pre-moe-patch) | 10.2 | - | 0.3 | - | - | results/ch1_20260611/ch1.1_021/manifest.csv |
-| 0.21.0/cu126 | fp8 | TP4 | 1 | fp8-plugin+coalesced | 46.48 | - | 0.18 | - | - | results/ch1_20260611/ch1.1_021/manifest.csv |
-| 0.21.0/cu126 | fp16 | TP4 | 1 | stock(pre-moe-patch) | 10.91 | - | - | - | - | results/moe_stages_ab_g26b_20260613_051056/SUMMARY.txt |
-| 0.21.0/cu126 | fp16 | TP4 | 8 | stock(pre-moe-patch) | 3.58 | 28.3 | - | - | - | results/moe_stages_ab_g26b_20260613_053254/SUMMARY.txt |
-| 0.21.0/cu126 | fp16 | TP4 | 1 | +moe_patch(heuristic) | 43.66 | - | - | - | - | results/moe_stages_ab_g26b_20260613_051056/SUMMARY.txt |
-| 0.21.0/cu126 | fp16 | TP4 | 8 | +moe_patch(heuristic) | 19.1 | 145.15 | - | - | - | results/moe_stages_ab_g26b_20260613_053254/SUMMARY.txt |
-| 0.21.0/cu126 | fp16 | TP4 | 1 | +moe_patch(tuned-json) | 43.71 | - | - | - | - | results/moe_stages_ab_g26b_20260613_051056/SUMMARY.txt |
-| 0.21.0/cu126 | fp16 | TP4 | 8 | +moe_patch(tuned-json) | 20.23 | 155.94 | - | - | - | results/moe_stages_ab_g26b_20260613_053254/SUMMARY.txt |
-| 0.21.0/cu126 | fp8 | TP4 | 1 | fp8-plugin+coalesced | 72.85 | 72.85 | 50.826 | - | 0.980 | results/perf_v2_g26b_fp8_021_20260621_044847 |
-| 0.21.0/cu126 | fp8 | TP4 | 2 | fp8-plugin+coalesced | 59.26 | 118.52 | - | - | - | results/perf_v2_g26b_fp8_021_20260621_044847 |
-| 0.21.0/cu126 | fp8 | TP4 | 4 | fp8-plugin+coalesced | 48.4 | 193.6 | - | - | - | results/perf_v2_g26b_fp8_021_20260621_044847 |
-| 0.21.0/cu126 | fp8 | TP4 | 8 | fp8-plugin+coalesced | 33.51 | 268.05 | - | - | - | results/perf_v2_g26b_fp8_021_20260621_044847 |
-| 0.21.0/cu126 | fp16 | TP4 | 1 | +moe_patch | 44.39 | 44.39 | 53.751 | - | 0.851 | results/perf_v2_g26b_fp16_021_20260621_045653 |
-| 0.21.0/cu126 | fp16 | TP4 | 2 | +moe_patch | 35.53 | 71.06 | - | - | - | results/perf_v2_g26b_fp16_021_20260621_045653 |
-| 0.21.0/cu126 | fp16 | TP4 | 4 | +moe_patch | 23.16 | 92.64 | - | - | - | results/perf_v2_g26b_fp16_021_20260621_045653 |
-| 0.21.0/cu126 | fp16 | TP4 | 8 | +moe_patch | 21.61 | 172.86 | - | - | - | results/perf_v2_g26b_fp16_021_20260621_045653 |
-| 0.19.0/cu128 | fp16 | TP4 | 1 | +moe_patch | 39.47 | 39.47 | 56.932 | - | 0.872 | results/perf_v2_g26b_fp16_019_20260620_224851 |
-| 0.19.0/cu128 | fp16 | TP4 | 2 | +moe_patch | 32.98 | 65.96 | - | - | - | results/perf_v2_g26b_fp16_019_20260620_224851 |
-| 0.19.0/cu128 | fp16 | TP4 | 4 | +moe_patch | 28.35 | 113.4 | - | - | - | results/perf_v2_g26b_fp16_019_20260620_224851 |
-| 0.19.0/cu128 | fp16 | TP4 | 8 | +moe_patch | 20.41 | 163.26 | - | - | - | results/perf_v2_g26b_fp16_019_20260620_224851 |
-| 0.21.0/cu126 | fp8 | TP2 | 1 | fp8-plugin+coalesced | 60.15 | 60.15 | - | - | - | results/perf_v2_g26b2_fp8_021_20260622_005415 |
-| 0.21.0/cu126 | fp8 | TP2 | 2 | fp8-plugin+coalesced | 46.37 | 92.74 | - | - | - | results/perf_v2_g26b2_fp8_021_20260622_005415 |
-| 0.21.0/cu126 | fp8 | TP2 | 4 | fp8-plugin+coalesced | 32.6 | 130.4 | - | - | - | results/perf_v2_g26b2_fp8_021_20260622_005415 |
-| 0.21.0/cu126 | fp8 | TP2 | 8 | fp8-plugin+coalesced | 17.54 | 140.34 | - | - | - | results/perf_v2_g26b2_fp8_021_20260622_005415 |
+| 0.21.0/cu126 | FP16* | TP4 | 1 | stock(pre-moe-patch) | 10.2 | - | 0.3 | - | - | results/ch1_20260611/ch1.1_021/manifest.csv |
+| 0.21.0/cu126 | FP8 | TP4 | 1 | fp8-plugin+coalesced | 46.48 | - | 0.18 | - | - | results/ch1_20260611/ch1.1_021/manifest.csv |
+| 0.21.0/cu126 | FP16* | TP4 | 1 | stock(pre-moe-patch) | 10.91 | - | - | - | - | results/moe_stages_ab_g26b_20260613_051056/SUMMARY.txt |
+| 0.21.0/cu126 | FP16* | TP4 | 8 | stock(pre-moe-patch) | 3.58 | 28.3 | - | - | - | results/moe_stages_ab_g26b_20260613_053254/SUMMARY.txt |
+| 0.21.0/cu126 | FP16* | TP4 | 1 | +moe_patch(heuristic) | 43.66 | - | - | - | - | results/moe_stages_ab_g26b_20260613_051056/SUMMARY.txt |
+| 0.21.0/cu126 | FP16* | TP4 | 8 | +moe_patch(heuristic) | 19.1 | 145.15 | - | - | - | results/moe_stages_ab_g26b_20260613_053254/SUMMARY.txt |
+| 0.21.0/cu126 | FP16* | TP4 | 1 | +moe_patch(tuned-json) | 43.71 | - | - | - | - | results/moe_stages_ab_g26b_20260613_051056/SUMMARY.txt |
+| 0.21.0/cu126 | FP16* | TP4 | 8 | +moe_patch(tuned-json) | 20.23 | 155.94 | - | - | - | results/moe_stages_ab_g26b_20260613_053254/SUMMARY.txt |
+| 0.21.0/cu126 | FP8 | TP4 | 1 | fp8-plugin+coalesced | 72.85 | 72.85 | 50.826 | - | 0.980 | results/perf_v2_g26b_fp8_021_20260621_044847 |
+| 0.21.0/cu126 | FP8 | TP4 | 2 | fp8-plugin+coalesced | 59.26 | 118.52 | - | - | - | results/perf_v2_g26b_fp8_021_20260621_044847 |
+| 0.21.0/cu126 | FP8 | TP4 | 4 | fp8-plugin+coalesced | 48.4 | 193.6 | - | - | - | results/perf_v2_g26b_fp8_021_20260621_044847 |
+| 0.21.0/cu126 | FP8 | TP4 | 8 | fp8-plugin+coalesced | 33.51 | 268.05 | - | - | - | results/perf_v2_g26b_fp8_021_20260621_044847 |
+| 0.21.0/cu126 | FP16* | TP4 | 1 | +moe_patch | 44.39 | 44.39 | 53.751 | - | 0.851 | results/perf_v2_g26b_fp16_021_20260621_045653 |
+| 0.21.0/cu126 | FP16* | TP4 | 2 | +moe_patch | 35.53 | 71.06 | - | - | - | results/perf_v2_g26b_fp16_021_20260621_045653 |
+| 0.21.0/cu126 | FP16* | TP4 | 4 | +moe_patch | 23.16 | 92.64 | - | - | - | results/perf_v2_g26b_fp16_021_20260621_045653 |
+| 0.21.0/cu126 | FP16* | TP4 | 8 | +moe_patch | 21.61 | 172.86 | - | - | - | results/perf_v2_g26b_fp16_021_20260621_045653 |
+| 0.19.0/cu128 | FP16* | TP4 | 1 | +moe_patch | 39.47 | 39.47 | 56.932 | - | 0.872 | results/perf_v2_g26b_fp16_019_20260620_224851 |
+| 0.19.0/cu128 | FP16* | TP4 | 2 | +moe_patch | 32.98 | 65.96 | - | - | - | results/perf_v2_g26b_fp16_019_20260620_224851 |
+| 0.19.0/cu128 | FP16* | TP4 | 4 | +moe_patch | 28.35 | 113.4 | - | - | - | results/perf_v2_g26b_fp16_019_20260620_224851 |
+| 0.19.0/cu128 | FP16* | TP4 | 8 | +moe_patch | 20.41 | 163.26 | - | - | - | results/perf_v2_g26b_fp16_019_20260620_224851 |
+| 0.21.0/cu126 | FP8 | TP2 | 1 | fp8-plugin+coalesced | 60.15 | 60.15 | - | - | - | results/perf_v2_g26b2_fp8_021_20260622_005415 |
+| 0.21.0/cu126 | FP8 | TP2 | 2 | fp8-plugin+coalesced | 46.37 | 92.74 | - | - | - | results/perf_v2_g26b2_fp8_021_20260622_005415 |
+| 0.21.0/cu126 | FP8 | TP2 | 4 | fp8-plugin+coalesced | 32.6 | 130.4 | - | - | - | results/perf_v2_g26b2_fp8_021_20260622_005415 |
+| 0.21.0/cu126 | FP8 | TP2 | 8 | fp8-plugin+coalesced | 17.54 | 140.34 | - | - | - | results/perf_v2_g26b2_fp8_021_20260622_005415 |
+
+_\*BF16 checkpoint, served as FP16 on V100 (sm_70 has no native BF16; `--dtype float16`) — the decode/latency numbers are FP16 runtime._
 <!-- endrender -->

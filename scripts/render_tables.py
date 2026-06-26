@@ -36,7 +36,7 @@ def md(headers, lines, align=None):
 
 def overview():
     def row(r):
-        return [r["model"], r["variant"], f"{r['params_total_b']}B/{r['params_active_b']}B",
+        return [r["model"], fmt(r["variant"]), f"{r['params_total_b']}B/{r['params_active_b']}B",
                 f"TP{r['tp']}", r["tok_s_per_user"], r["ttft_s"] or "-", r["config"]]
     lines, seen = [], set()
     # baseline: Ch1 single-user reliability rows (one per checkpoint), or a later revisit's C1 row
@@ -109,7 +109,7 @@ def model(sub):
             "Per-user", "Aggregate", "Cold TTFT", "FA Cold", "Prefix Hit", "Result path"]
     return md(head,
               [([eng(r)] if multi else []) +
-               [r["variant"], f"TP{r['tp']}", r["users"], r["config"], r["tok_s_per_user"],
+               [fmt(r["variant"]), f"TP{r['tp']}", r["users"], r["config"], r["tok_s_per_user"],
                 r["tok_s_aggregate"] or "-", r["ttft_s"] or "-", r.get("ttft_fa_cold_s") or "-",
                 r.get("ttft_prefix_hit_s") or "-", r["result_path"]] for r in sel])
 
@@ -164,8 +164,24 @@ def short(name):                       # official checkpoint -> family short nam
     return s
 
 
-def fmt(v):
-    return {"fp16": "FP16", "fp8": "FP8", "bf16": "BF16"}.get(v, v)
+def fmt(v):       # PERFORMANCE/runtime label: V100 (sm_70) has no usable BF16 path, so every
+    # full-precision checkpoint is served `--dtype float16` — labelled FP16* (* -> the footnote below).
+    return {"fp16": "FP16*", "bf16": "FP16*", "fp8": "FP8"}.get(v, v)
+
+
+def fmt_src(v):   # IDENTITY/source label: the full-precision base checkpoints all ship in BF16
+    # (Qwen, Gemma, GLM). Used only by model-info tables (no perf numbers) — see methodology.
+    return {"fp16": "BF16", "bf16": "BF16", "fp8": "FP8"}.get(v, v)
+
+
+# Footnote auto-appended under any PERFORMANCE table that carries an FP16* label (full-precision
+# rows = BF16 checkpoints executed as FP16 on V100). Skipped on FP8/Int4-only tables (no FP16*).
+FP16_NOTE = ("\n\n_\\*BF16 checkpoint, served as FP16 on V100 (sm_70 has no native BF16; "
+             "`--dtype float16`) — the decode/latency numbers are FP16 runtime._")
+
+
+def _fp16note(s):
+    return s + FP16_NOTE if "FP16*" in s else s
 
 
 def _blank_repeat(lines, col=0):       # blank a column when equal to the previous row (rowspan look)
@@ -187,7 +203,7 @@ def models_tested():                   # Table 1: identity primer (short | type 
         if k in seen:
             continue
         seen.add(k)
-        lines.append([short(r["model"]), r["model_type"], fmt(r["variant"]), f"`{r['model']}`"])
+        lines.append([short(r["model"]), r["model_type"], fmt_src(r["variant"]), f"`{r['model']}`"])
     lines.sort(key=lambda x: (x[0], x[2]))
     prev = None                        # blank short-name AND type within a family
     for ln in lines:
@@ -218,6 +234,8 @@ def baseline():                        # Table 2: single-user, same-TP, dual-eng
             note.append("0.19 n/a (gemma4.py)")
         elif "0.19.0" in d and "tf5" in d["0.19.0"]["flags"]:
             note.append("tf5 on 0.19")
+        if any("quality=fail" in r.get("notes", "") for r in d.values()):
+            note.append("⚠ degenerate output (GPTQ-on-Volta) — speed-only")
         lines.append([short(mdl), fmt(var), c19, c21, "; ".join(note)])
     _blank_repeat(lines, 0)
     return md(["Model", "Format", "vLLM 0.19 C1", "vLLM 0.21 C1", "Notes"], lines)
@@ -283,26 +301,22 @@ DIGEST_SPECS = {
     "qwen3_6_27b": {
         "match": "Qwen3.6-27B",
         "engines": ["0.19.0", "0.21.0"],
-        "configs": [("FP16 TP4", "fp16", "4"), ("FP8 TP4", "fp8", "4"),
-                    ("FP8 TP2", "fp8", "2", "single_user")],   # half-GPU = a fit option, not scaling
+        "configs": [("FP16* TP4", "fp16", "4"), ("FP8 TP4", "fp8", "4")],   # fleet TP4; TP2 = Ch5 capacity note, not scaling
     },
     "qwen3_6_35b_a3b": {
         "match": "Qwen3.6-35B-A3B",
         "engines": ["0.19.0", "0.21.0"],
-        "configs": [("FP16 TP4", "fp16", "4"), ("FP8 TP4", "fp8", "4"),
-                    ("FP8 TP2", "fp8", "2", "single_user")],   # half-GPU = a fit option, not scaling
+        "configs": [("FP16* TP4", "fp16", "4"), ("FP8 TP4", "fp8", "4")],   # fleet TP4; TP2 = Ch5 capacity note, not scaling
     },
     "qwen3_5_27b": {
         "match": "Qwen3.5-27B",
-        "engines": ["0.21.0"],
-        "configs": [("FP16 TP4", "fp16", "4"), ("FP8 TP4", "fp8", "4"),
-                    ("FP8 TP2", "fp8", "2", "single_user")],   # half-GPU = a fit option
+        "engines": ["0.19.0", "0.21.0"],
+        "configs": [("FP16* TP4", "fp16", "4"), ("FP8 TP4", "fp8", "4")],   # fleet TP4; TP2 = Ch5 capacity note
     },
     "qwen3_5_35b_a3b": {
         "match": "Qwen3.5-35B-A3B",
-        "engines": ["0.21.0"],
-        "configs": [("FP16 TP4", "fp16", "4"), ("FP8 TP4", "fp8", "4"),
-                    ("FP8 TP2", "fp8", "2", "single_user")],   # half-GPU = a fit option
+        "engines": ["0.19.0", "0.21.0"],
+        "configs": [("FP16* TP4", "fp16", "4"), ("FP8 TP4", "fp8", "4")],   # fleet TP4; TP2 = Ch5 capacity note
     },
     "qwen3_5_122b_a10b": {
         "match": "Qwen3.5-122B-A10B",
@@ -312,13 +326,13 @@ DIGEST_SPECS = {
     "gemma4_31b": {
         "match": "gemma-4-31B",
         "engines": ["0.19.0", "0.21.0"],
-        "configs": [("FP16 TP4", "fp16", "4"), ("FP8 TP4", "fp8", "4"),
+        "configs": [("FP16* TP4", "fp16", "4"), ("FP8 TP4", "fp8", "4"),
                     ("FP8 TP2", "fp8", "2", "single_user")],
     },
     "gemma4_26b_a4b": {
         "match": "gemma-4-26B-A4B",
         "engines": ["0.19.0", "0.21.0"],
-        "configs": [("FP16 TP4", "fp16", "4"), ("FP8 TP4", "fp8", "4"),
+        "configs": [("FP16* TP4", "fp16", "4"), ("FP8 TP4", "fp8", "4"),
                     ("FP8 TP2", "fp8", "2", "single_user")],
     },
     "glm4_5_air": {
@@ -329,7 +343,7 @@ DIGEST_SPECS = {
     "glm4_7_flash": {
         "match": "GLM-4.7-Flash",
         "engines": ["0.19.0", "0.21.0"],
-        "configs": [("BF16 TP4", "bf16", "4")],
+        "configs": [("FP16* TP4", "bf16", "4")],   # perf label = FP16 (runtime); BF16 ckpt noted in prose
     },
 }
 
@@ -419,8 +433,25 @@ def concurrency(key):                  # same-TP scaling: per-config per-user/ag
               align=["l", "l", "r", "r", "r", "r"])
 
 
-def resolve(cmd):
-    cmd = cmd.strip()
+def triad(key):                        # Ch5 dual-engine triad: FP16/FP8/Int4 x {0.19,0.21}, per-user C1-C8 @TP4
+    s = DIGEST_SPECS[key]
+    match = s["match"]
+    precs = [("FP16*", "fp16"), ("FP8", "fp8"), ("GPTQ-Int4", "GPTQ-Int4")]
+    lines = []
+    for plabel, var in precs:
+        for e in ("0.19.0", "0.21.0"):
+            cells = [(_digest_row(match, e, var, "4", u) or {}).get("tok_s_per_user", "—")
+                     for u in ("1", "2", "4", "8")]
+            lines.append([plabel, _eng(e)] + cells)
+    _blank_repeat(lines, 0)            # blank repeated Precision — the two engine rows fold under it
+    return md(["Precision", "Engine", "C1", "C2", "C4", "C8"], lines, align=["l", "l", "r", "r", "r", "r"])
+
+
+def resolve(cmd):                      # public entry: dispatch, then attach the FP16* footnote if present
+    return _fp16note(_dispatch(cmd.strip()))
+
+
+def _dispatch(cmd):
     if cmd == "overview":
         return overview()
     if cmd == "moe_fix":
@@ -445,6 +476,8 @@ def resolve(cmd):
         return ttft(cmd.split(":", 1)[1])
     if cmd.startswith("concurrency:"):
         return concurrency(cmd.split(":", 1)[1])
+    if cmd.startswith("triad:"):
+        return triad(cmd.split(":", 1)[1])
     if cmd == "ttft_matrix":
         return ttft_matrix()
     return f"_(unknown render command: {cmd})_"
