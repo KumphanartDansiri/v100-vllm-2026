@@ -109,8 +109,10 @@ envelope** while FP8 and Int4 fit (C1 tok/s):
 
 The two OOMs differ: 35B-A3B FP16 is a **hard weight-OOM** (~33 GB/GPU before any KV); 27B FP16 is a
 **KV-room OOM** (weights load, the standard envelope leaves no KV headroom). Either way, **FP8 is the
-faithful format that puts a modern MoE on half the GPUs** — FP16 cannot. Full per-concurrency TP2
-tables: the [27B](../models/qwen3_5_27b.md) and [35B-A3B](../models/qwen3_5_35b_a3b.md) model pages.
+faithful format that puts a modern MoE on half the GPUs** — FP16 cannot. The full **fleet TP4** triad
+(FP16/FP8/Int4 × both engines, C1–C8) is on the [27B](../models/qwen3_5_27b.md) and
+[35B-A3B](../models/qwen3_5_35b_a3b.md) model pages; the TP2 half-GPU result above is the 4096-ctx
+capacity sub-study (full per-concurrency C1–C8 in the engineering archive).
 
 ## Triad performance comparison — both engines (the dual-engine promotion)
 
@@ -225,8 +227,9 @@ for the **C8-dense aggregate** (the CUDA-core wall). Output is bit-deterministic
 *Evidence: `results/coal_ab_q122b_*`, `results/coal_ab_glm_*` (flagship A/B), the SSOT's matched 122B
 FP8-vs-Int4 rows (`data/benchmark_matrix.csv`), `results/fp8_vecdq_microbench_20260620/` (the dense
 GEMV-vs-cuBLAS M-scaling + half2/vecdq dead ends), `results/ch1_20260611/` (single-user matrix).
-**Qwen3.5 exact pair:** decode `results/q27b_exact_triad_*` + `results/q35b_exact_triad_*` (TP4 and
-`*_tp2_*` half-GPU); TTFT `results/perf_v2_q27b35_*` + `results/perf_v2_q35b35_*` (and the matched 3.6
-TP4 fill `results/perf_v2_q27b_fp8_021_20260625_*` / `…q35b_fp8…`); faithfulness from `tools/ch1_report.py`
+**Qwen3.5 pair:** fleet TP4 decode + TTFT + correctness battery `results/perf_v2_q27b35_*` +
+`results/perf_v2_q35b35_*` (the canonical fleet rows); the **TP2 half-GPU capacity sub-study** from
+`results/q27b_exact_triad_*_tp2_*` + `results/q35b_exact_triad_*_tp2_*` (4096-ctx); faithfulness /
+exactness from the perf_v2 battery (`quality_status` + run-to-run sha)
 on `/tmp/v100_ch1/manifest.csv` (Axis-1 self-stability + Axis-2 FP8-vs-FP16 agreement). Kernel
 details + the dense-vs-MoE profile in the code repo's `docs/COALESCED_FP8_GEMV.md` and `docs/SESSION_LOG.md`.*
