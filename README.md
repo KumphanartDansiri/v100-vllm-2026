@@ -71,7 +71,7 @@ model-family pages are reconciled to the dual-engine SSOT matrix (frozen at tag
 
 ## Code
 
-The FP8 plugin + the MoE fix live in the companion repo **fp8-w8a16-sm70** (link TBD on publish).
+The FP8 plugin + the MoE fix live in the companion repo **[fp8-w8a16-sm70](https://github.com/KumphanartDansiri/vllm-fp8-w8a16-sm70)**.
 This repo is the *evidence/results*; that repo is the *software*.
 
 ## Known limitations (read before quoting numbers)
