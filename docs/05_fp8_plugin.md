@@ -70,17 +70,25 @@ checkpoints — one dense (**27B**), one MoE (**35B-A3B**) — each as official 
 W8A16**, and **GPTQ-Int4**, at full **TP4** and half **TP2**. Per-user decode tok/s (vLLM 0.21,
 4096 ctx, 512 tok, temp 0):
 
-**Dense — Qwen3.5-27B** · **MoE — Qwen3.5-35B-A3B** (TP4)
-| Users | 27B FP16 | 27B FP8 | (×) | 27B Int4 | 35B FP16 | 35B FP8 | (×) | 35B Int4 |
-|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| 1 | 39.1 | **52.5** | 1.34× | 69.2 | 66.2 | **92.9** | 1.40× | 126.2 |
-| 2 | 31.1 | **42.5** | 1.37× | 55.5 | 45.4 | **77.6** | 1.71× | 96.1 |
-| 4 | 30.3 | 31.7 | 1.05× | 47.4 | 29.5 | **72.4** | 2.45× | 76.2 |
-| 8 | 29.3 | 20.3 | 0.69× | 44.2 | 22.9 | **54.9** | 2.40× | 75.1 |
+**Dense — Qwen3.5-27B** (TP4, per-user tok/s)
+| Users | FP16 | FP8 W8A16 | GPTQ-Int4 |
+|---:|---:|---:|---:|
+| 1 | 39.1 | **52.5** | 69.2 |
+| 2 | 31.1 | **42.5** | 55.5 |
+| 4 | 30.3 | 31.7 | 47.4 |
+| 8 | 29.3 | 20.3 | 44.2 |
 
-Dense reproduces the crossover (FP8 wins C1–C2, ties C4, FP16 reclaims C8 — the CUDA-core wall
-above); MoE-FP8 wins at *every* concurrency and the margin **grows** with load. Int4 is fastest raw
-but lossy.
+**MoE — Qwen3.5-35B-A3B** (TP4, per-user tok/s)
+| Users | FP16 | FP8 W8A16 | GPTQ-Int4 |
+|---:|---:|---:|---:|
+| 1 | 66.2 | **92.9** | 126.2 |
+| 2 | 45.4 | **77.6** | 96.1 |
+| 4 | 29.5 | **72.4** | 76.2 |
+| 8 | 22.9 | **54.9** | 75.1 |
+
+Dense reproduces the crossover (FP8 **1.34×** FP16 at C1, parity at C4, **0.69×** at C8 — the
+CUDA-core wall above); MoE-FP8 wins at *every* concurrency and the margin **grows with load
+(1.40× → 2.45×)**. Int4 is fastest raw but lossy. (FP8 cells in **bold** where they beat FP16.)
 
 **Capacity — the half-TP result.** At TP2 (2×32 GB) **both FP16 checkpoints fall out of the serving
 envelope** while FP8 and Int4 fit (C1 tok/s):
