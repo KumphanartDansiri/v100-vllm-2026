@@ -4,7 +4,8 @@
 
 **Ready-to-send packet:** [../upstream_feedback/flash_attention_v100/](../upstream_feedback/flash_attention_v100/) — the patch, reproducers, and a paste-ready issue.
 
-**Upstream:** `flash-attention-v100` by **D. Skryabin (ai-bond, @ai_bond007)** — a from-scratch
+**Upstream:** **[`flash-attention-v100`](https://github.com/ai-bond/flash-attention-v100)** by
+**D. Skryabin (ai-bond, @ai_bond007)** — a from-scratch
 FlashAttention for Volta that emulates the missing `m16n16k16` tensor-core path with V100's `m8n8k4`
 MMA, keeping Tri Dao's public API and `flash_attn_*_cuda` symbols intact. **License: BSD-3-Clause**
 (© D. Skryabin).

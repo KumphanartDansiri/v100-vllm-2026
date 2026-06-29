@@ -37,14 +37,18 @@ We changed nothing in these; they are the ground the rest stands on, and we're g
   baseline at 122B.
 
 ## Project pages (what we built on · what we send back)
-- [flash-attention-v100 (ai-bond)](../acknowledgements/flash_attention_v100.md) — the V100 FlashAttention
+- [flash-attention-v100 (ai-bond)](../acknowledgements/flash_attention_v100.md)
+  ([upstream repo](https://github.com/ai-bond/flash-attention-v100)) — the V100 FlashAttention
   kernels behind every prefill/TTFT win and the first MLA model on Volta. We send back **3 fixes**
   (paged-KV straddle, CUDA-12.6 build, strided-Q) with reproducers.
-- [vLLM](../acknowledgements/vllm.md) — both engines (0.19 + 0.21); the whole thing runs on its source.
+- [vLLM](../acknowledgements/vllm.md)
+  ([upstream repo](https://github.com/vllm-project/vllm)) — both engines (0.19 + 0.21); the whole thing runs on its source.
   We send back a **diagnostic + V100 MoE config data** (the `BLOCK_K=128` finding, Chapter 2).
-- [aphrodite-engine](../acknowledgements/aphrodite.md) — the "upstream-and-ride" alternative. We have a
+- [aphrodite-engine](../acknowledgements/aphrodite.md)
+  ([upstream repo](https://github.com/dphnAI/aphrodite-engine)) — the "upstream-and-ride" alternative. We have a
   clean **sm\_70 build rewire** and a **MoE-heuristic PR** prepared for it.
-- [1Cat-vLLM (1CatAI)](../acknowledgements/onecat_vllm.md) — an independent V100/sm\_70 vLLM effort run
+- [1Cat-vLLM (1CatAI)](../acknowledgements/onecat_vllm.md)
+  ([upstream repo](https://github.com/1CatAI/1Cat-vLLM)) — an independent V100/sm\_70 vLLM effort run
   in parallel with ours. No code imported, but real lessons exchanged — credited here in full.
 
 ## Feedback we're contributing back — at a glance

@@ -4,9 +4,10 @@
 
 **Notes packet:** [../upstream_feedback/onecat_vllm/](../upstream_feedback/onecat_vllm/) — the comparison notes (no code).
 
-**Upstream:** **1Cat-vLLM** by **1CatAI** — an independent Tesla-V100 / sm\_70 vLLM fork (1.0.0,
-mid-2026) carrying AWQ-4bit sm\_70 kernels, a FlashAttention-V100 backend, FP8 (`e5m2`) KV cache, and
-MTP speculative decoding for Qwen3.6. See the upstream repository for its license.
+**Upstream:** **[1Cat-vLLM](https://github.com/1CatAI/1Cat-vLLM)** by **1CatAI** — an independent
+Tesla-V100 / sm\_70 vLLM fork (1.0.0, mid-2026) carrying AWQ-4bit sm\_70 kernels, a
+FlashAttention-V100 backend, FP8 (`e5m2`) KV cache, and MTP speculative decoding for Qwen3.6. See the
+upstream repository for its license.
 
 ## Why it's here
 We weren't the only people refusing to call the V100 dead. 1CatAI shipped a serious, audited sm\_70

@@ -4,7 +4,8 @@
 
 **Ready-to-send packet:** [../upstream_feedback/aphrodite/](../upstream_feedback/aphrodite/) — the sm_70 build-rewire + MoE-PR plan.
 
-**Upstream:** **aphrodite-engine** (dphnAI, formerly PygmalionAI; maintained by AlpinDale) — a
+**Upstream:** **[aphrodite-engine](https://github.com/dphnAI/aphrodite-engine)**
+(dphnAI, formerly PygmalionAI; maintained by AlpinDale) — a
 community vLLM-derived serving engine with a deliberately broad hardware-support stance.
 **License: AGPL-3.0.**
 
